@@ -1,4 +1,24 @@
-import { Category } from './types';
+import { Account, Category, Currency } from './types';
+
+/** Счёт, на который переезжают все записи, заведённые до появления счетов */
+export const DEFAULT_ACCOUNT_ID = 'acc-main';
+
+export function makeDefaultAccount(currency: Currency): Account {
+  return {
+    id: DEFAULT_ACCOUNT_ID,
+    name: 'Основной',
+    kind: 'card',
+    currency,
+    openingBalance: 0,
+    color: '#7EB8D4',
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/** Пополнение копилки — расход по этой категории */
+export const SAVINGS_OUT_CATEGORY_ID = 'cat-savings-out';
+/** Снятие из копилки — доход по этой категории */
+export const SAVINGS_IN_CATEGORY_ID = 'cat-savings-in';
 
 export const DEFAULT_CATEGORIES: Category[] = [
   {
@@ -121,6 +141,23 @@ export const DEFAULT_CATEGORIES: Category[] = [
       { id: 'sub-sale', name: 'Продажа', categoryId: 'cat-other-income' },
       { id: 'sub-other-inc', name: 'Прочее', categoryId: 'cat-other-income' },
     ],
+  },
+  // Системные категории: через них движение денег в копилки попадает в баланс
+  {
+    id: SAVINGS_OUT_CATEGORY_ID,
+    name: 'В копилку',
+    type: 'expense',
+    color: '#A8C5A0',
+    icon: '🐷',
+    subcategories: [],
+  },
+  {
+    id: SAVINGS_IN_CATEGORY_ID,
+    name: 'Из копилки',
+    type: 'income',
+    color: '#A8C5A0',
+    icon: '🐷',
+    subcategories: [],
   },
 ];
 

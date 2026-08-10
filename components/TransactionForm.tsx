@@ -1,73 +1,98 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Transaction, TransactionType, Category, Currency, CURRENCY_SYMBOLS, CURRENCY_LABELS, Settings } from '@/lib/types';
-import { formatMoney, convertAmount } from '@/lib/storage';
+import {
+  Transaction, TransactionType, Category, Currency, Account, ACCOUNT_KIND_ICONS,
+  CURRENCY_SYMBOLS, CURRENCIES, Settings,
+} from '@/lib/types';
+import { formatMoney, convertAmount, rateFor } from '@/lib/storage';
+import { todayKey, normalizeDate } from '@/lib/dates';
 import { X } from 'lucide-react';
-import { format } from 'date-fns';
 
 interface Props {
   categories: Category[];
+  accounts: Account[];
   settings: Settings;
   onAdd: (tx: Transaction) => void;
   onClose: () => void;
   initial?: Transaction;
 }
 
-const CURRENCIES: Currency[] = ['RUB', 'USD', 'EUR'];
-
-export default function TransactionForm({ categories, settings, onAdd, onClose, initial }: Props) {
+export default function TransactionForm({ categories, accounts, settings, onAdd, onClose, initial }: Props) {
   const [type, setType] = useState<TransactionType>(initial?.type ?? 'expense');
   const [amount, setAmount] = useState(initial ? String(initial.amount) : '');
-  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? settings.baseCurrency);
+  const [accountId, setAccountId] = useState(initial?.accountId ?? accounts[0]?.id ?? '');
+  // Новая запись по умолчанию в валюте счёта, а не в основной валюте приложения
+  const [currency, setCurrency] = useState<Currency>(
+    initial?.currency ?? accounts.find(a => a.id === (initial?.accountId ?? accounts[0]?.id))?.currency ?? settings.baseCurrency,
+  );
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? '');
   const [subcategoryId, setSubcategoryId] = useState(initial?.subcategoryId ?? '');
   const [note, setNote] = useState(initial?.note ?? '');
-  const [date, setDate] = useState(initial?.date ? initial.date.slice(0, 10) : format(new Date(), 'yyyy-MM-dd'));
+  // Дата — календарная строка, без Date и без UTC
+  const [date, setDate] = useState(initial ? normalizeDate(initial.date) : todayKey());
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   const filtered = categories.filter(c => c.type === type);
   const selectedCat = categories.find(c => c.id === categoryId);
 
-  // Show converted amount hint when currency ≠ baseCurrency
-  const convertedHint = (() => {
-    const n = Number(amount);
-    if (!n || currency === settings.baseCurrency) return null;
-    const converted = convertAmount(n, currency, settings.baseCurrency, settings.rates);
-    return `≈ ${formatMoney(converted, settings.baseCurrency)}`;
+  const parsedAmount = Number(amount);
+  const amountValid = amount !== '' && Number.isFinite(parsedAmount) && parsedAmount > 0;
+
+  // Курс, который будет записан в операцию.
+  // При правке сохраняем исходный — иначе старая запись пересчитается по-новому.
+  const currencyUnchanged = initial && initial.currency === currency;
+  const effectiveRate = currencyUnchanged && Number(initial?.rate) > 0
+    ? Number(initial!.rate)
+    : rateFor(currency, settings.rates);
+
+  // Подсказка пересчёта. Раньше здесь всегда подставлялся курс USD или EUR,
+  // из-за чего для рублёвой операции при базовой валюте $ выводилось «1 ₽ = 98 ₽».
+  const conversion = (() => {
+    if (!amountValid || currency === settings.baseCurrency) return null;
+    const converted = convertAmount(parsedAmount, currency, settings.baseCurrency, settings.rates);
+    const pairRate = convertAmount(1, currency, settings.baseCurrency, settings.rates);
+    return {
+      approx: `≈ ${formatMoney(converted, settings.baseCurrency)}`,
+      rate: `курс: 1 ${CURRENCY_SYMBOLS[currency]} = ${formatMoney(pairRate, settings.baseCurrency)}`,
+    };
   })();
 
   const handleSubmit = () => {
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      setError('Введите корректную сумму');
-      return;
-    }
-    if (!categoryId) {
-      setError('Выберите категорию');
-      return;
-    }
-    const tx: Transaction = {
+    if (!amountValid) { setError('Введите корректную сумму'); return; }
+    if (!categoryId) { setError('Выберите категорию'); return; }
+    if (!accountId) { setError('Выберите счёт'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { setError('Укажите дату'); return; }
+
+    onAdd({
       id: initial?.id ?? uuidv4(),
       type,
-      amount: Number(amount),
+      amount: parsedAmount,
       currency,
+      rate: effectiveRate,
+      accountId,
       categoryId,
       subcategoryId: subcategoryId || undefined,
-      note: note || undefined,
-      date: new Date(date).toISOString(),
+      note: note.trim() || undefined,
+      date,
       createdAt: initial?.createdAt ?? new Date().toISOString(),
-    };
-    onAdd(tx);
+    });
     onClose();
   };
 
   return (
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
+      <div className="modal" role="dialog" aria-modal="true" aria-label={initial ? 'Редактировать запись' : 'Новая запись'}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold">{initial ? 'Редактировать' : 'Новая запись'}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+          <button onClick={onClose} aria-label="Закрыть" className="p-1.5 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
             <X size={18} strokeWidth={2} />
           </button>
         </div>
@@ -84,7 +109,7 @@ export default function TransactionForm({ categories, settings, onAdd, onClose, 
                 color: type === t
                   ? (t === 'income' ? 'var(--sage)' : 'var(--red)')
                   : 'var(--text-muted)',
-                boxShadow: type === t ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                boxShadow: type === t ? 'var(--shadow-seg)' : 'none',
               }}
             >
               {t === 'expense' ? '↓ Расход' : '↑ Доход'}
@@ -100,23 +125,27 @@ export default function TransactionForm({ categories, settings, onAdd, onClose, 
               <input
                 className="input pr-3 num text-lg"
                 type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
                 placeholder="0"
                 value={amount}
                 onChange={e => { setAmount(e.target.value); setError(''); }}
+                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                 autoFocus
               />
             </div>
-            {/* Currency picker */}
             <div className="flex gap-1 p-1 rounded-xl flex-shrink-0" style={{ background: 'var(--bg-card2)' }}>
               {CURRENCIES.map(c => (
                 <button
                   key={c}
                   onClick={() => setCurrency(c)}
+                  aria-label={c}
                   className="px-2.5 py-1 rounded-lg text-sm font-medium transition-all"
                   style={{
                     background: currency === c ? 'var(--bg-card)' : 'transparent',
                     color: currency === c ? 'var(--text)' : 'var(--text-muted)',
-                    boxShadow: currency === c ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                    boxShadow: currency === c ? 'var(--shadow-seg)' : 'none',
                     minWidth: 36,
                   }}
                 >
@@ -125,15 +154,39 @@ export default function TransactionForm({ categories, settings, onAdd, onClose, 
               ))}
             </div>
           </div>
-          {/* Converted hint */}
-          {convertedHint && (
+          {conversion && (
             <p className="text-xs mt-1.5 pl-1" style={{ color: 'var(--text-muted)' }}>
-              {convertedHint}
-              <span className="ml-1" style={{ color: 'var(--warm-400)' }}>
-                (курс: 1 {CURRENCY_SYMBOLS[currency]} = {currency === 'USD' ? settings.rates.USD : settings.rates.EUR} ₽)
-              </span>
+              {conversion.approx}
+              <span className="ml-1">({conversion.rate})</span>
             </p>
           )}
+          {currency !== 'RUB' && (
+            <p className="text-xs mt-1 pl-1" style={{ color: 'var(--text-muted)' }}>
+              Курс сохранится вместе с записью и не изменится задним числом.
+            </p>
+          )}
+        </div>
+
+        {/* Счёт */}
+        <div className="mb-3">
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Счёт</label>
+          <select
+            className="input"
+            value={accountId}
+            onChange={e => {
+              setAccountId(e.target.value);
+              // Подстраиваем валюту под счёт, пока пользователь не выбрал её вручную
+              const acc = accounts.find(a => a.id === e.target.value);
+              if (acc && !initial) setCurrency(acc.currency);
+              setError('');
+            }}
+          >
+            {accounts.map(a => (
+              <option key={a.id} value={a.id}>
+                {ACCOUNT_KIND_ICONS[a.kind]} {a.name} · {a.currency}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Date */}
@@ -143,30 +196,37 @@ export default function TransactionForm({ categories, settings, onAdd, onClose, 
             className="input"
             type="date"
             value={date}
-            onChange={e => setDate(e.target.value)}
+            max={todayKey()}
+            onChange={e => { setDate(e.target.value); setError(''); }}
           />
         </div>
 
         {/* Category */}
         <div className="mb-3">
           <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Категория</label>
-          <div className="grid grid-cols-2 gap-1.5">
-            {filtered.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => { setCategoryId(cat.id); setSubcategoryId(''); }}
-                className="flex items-center gap-2 p-2.5 rounded-xl text-sm text-left transition-all"
-                style={{
-                  background: categoryId === cat.id ? cat.color + '22' : 'var(--bg)',
-                  border: `1px solid ${categoryId === cat.id ? cat.color + '66' : 'var(--border)'}`,
-                  color: 'var(--text)',
-                }}
-              >
-                <span className="text-base">{cat.icon}</span>
-                <span className="truncate">{cat.name}</span>
-              </button>
-            ))}
-          </div>
+          {filtered.length === 0 ? (
+            <p className="text-sm p-3 rounded-xl" style={{ background: 'var(--bg-card2)', color: 'var(--text-muted)' }}>
+              Нет категорий этого типа — создайте её во вкладке «Категории».
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-1.5">
+              {filtered.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => { setCategoryId(cat.id); setSubcategoryId(''); setError(''); }}
+                  className="flex items-center gap-2 p-2.5 rounded-xl text-sm text-left transition-all"
+                  style={{
+                    background: categoryId === cat.id ? cat.color + '22' : 'var(--bg)',
+                    border: `1px solid ${categoryId === cat.id ? cat.color + '66' : 'var(--border)'}`,
+                    color: 'var(--text)',
+                  }}
+                >
+                  <span className="text-base">{cat.icon}</span>
+                  <span className="truncate">{cat.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Subcategory */}
@@ -195,12 +255,11 @@ export default function TransactionForm({ categories, settings, onAdd, onClose, 
             placeholder="Добавить заметку..."
             value={note}
             onChange={e => setNote(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
           />
         </div>
 
-        {error && (
-          <p className="text-sm mb-3" style={{ color: 'var(--red)' }}>{error}</p>
-        )}
+        {error && <p className="text-sm mb-3" style={{ color: 'var(--red)' }}>{error}</p>}
 
         <div className="flex gap-2">
           <button className="btn-ghost flex-1" onClick={onClose}>Отмена</button>

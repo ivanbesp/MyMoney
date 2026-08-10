@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Category, Subcategory, TransactionType } from '@/lib/types';
+import { Category, Subcategory, Transaction, TransactionType } from '@/lib/types';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from '@/lib/defaults';
+import ConfirmDialog from './ConfirmDialog';
 import { Plus, X, Pencil, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
 
 interface Props {
   categories: Category[];
+  transactions: Transaction[];
   onAdd: (cat: Category) => void;
   onUpdate: (cat: Category) => void;
   onDelete: (id: string) => void;
@@ -23,6 +25,12 @@ function CategoryForm({ initial, onSave, onClose }: {
   const [color, setColor] = useState(initial?.color ?? CATEGORY_COLORS[0]);
   const [icon, setIcon] = useState(initial?.icon ?? CATEGORY_ICONS[0]);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   const handleSave = () => {
     if (!name.trim()) { setError('Введите название'); return; }
@@ -42,7 +50,7 @@ function CategoryForm({ initial, onSave, onClose }: {
       <div className="modal">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold">{initial ? 'Редактировать' : 'Новая категория'}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={18} /></button>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-card2)] transition-colors"><X size={18} /></button>
         </div>
 
         {!initial && (
@@ -53,7 +61,7 @@ function CategoryForm({ initial, onSave, onClose }: {
                 style={{
                   background: type === t ? 'var(--bg-card)' : 'transparent',
                   color: type === t ? (t === 'income' ? 'var(--sage)' : 'var(--red)') : 'var(--text-muted)',
-                  boxShadow: type === t ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  boxShadow: type === t ? 'var(--shadow-seg)' : 'none',
                 }}
               >{t === 'expense' ? '↓ Расход' : '↑ Доход'}</button>
             ))}
@@ -126,9 +134,13 @@ function SubcategoryManager({ cat, onUpdate }: { cat: Category; onUpdate: (cat: 
         <button onClick={addSub} className="btn-primary px-3 py-1.5 text-sm">+</button>
       </div>
       {cat.subcategories.map(sub => (
-        <div key={sub.id} className="flex items-center justify-between py-1.5 group">
+        <div key={sub.id} className="flex items-center justify-between py-1.5 row-hover">
           <span className="text-sm" style={{ color: 'var(--text-muted)' }}>• {sub.name}</span>
-          <button onClick={() => deleteSub(sub.id)} className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-[var(--red-light)] transition-all">
+          <button
+            onClick={() => deleteSub(sub.id)}
+            aria-label={`Удалить подкатегорию ${sub.name}`}
+            className="row-actions p-1.5 rounded-lg hover:bg-[var(--red-light)] transition-all"
+          >
             <Trash2 size={12} style={{ color: 'var(--red)' }} />
           </button>
         </div>
@@ -137,13 +149,21 @@ function SubcategoryManager({ cat, onUpdate }: { cat: Category; onUpdate: (cat: 
   );
 }
 
-export default function Categories({ categories, onAdd, onUpdate, onDelete }: Props) {
+export default function Categories({ categories, transactions, onAdd, onUpdate, onDelete }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
+  const [deleting, setDeleting] = useState<Category | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<TransactionType | 'all'>('all');
 
   const filtered = categories.filter(c => filter === 'all' || c.type === filter);
+
+  // Сколько записей осиротеет, если удалить категорию
+  const usage = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of transactions) map.set(t.categoryId, (map.get(t.categoryId) ?? 0) + 1);
+    return map;
+  }, [transactions]);
 
   const toggle = (id: string) => {
     setExpanded(prev => {
@@ -157,6 +177,23 @@ export default function Categories({ categories, onAdd, onUpdate, onDelete }: Pr
     <div className="space-y-4">
       {showForm && <CategoryForm onSave={onAdd} onClose={() => setShowForm(false)} />}
       {editing && <CategoryForm initial={editing} onSave={onUpdate} onClose={() => setEditing(null)} />}
+      {deleting && (
+        <ConfirmDialog
+          title={`Удалить «${deleting.name}»?`}
+          description={
+            (usage.get(deleting.id) ?? 0) > 0 ? (
+              <>
+                На эту категорию ссылаются <strong>{usage.get(deleting.id)}</strong> записей.
+                Они останутся в истории, но будут показаны как «Без категории».
+              </>
+            ) : (
+              'Категория не используется ни в одной записи.'
+            )
+          }
+          onConfirm={() => onDelete(deleting.id)}
+          onClose={() => setDeleting(null)}
+        />
+      )}
 
       <div className="flex items-center gap-2">
         <div className="flex gap-1 p-1 rounded-xl flex-1" style={{ background: 'var(--bg-card2)' }}>
@@ -189,7 +226,7 @@ export default function Categories({ categories, onAdd, onUpdate, onDelete }: Pr
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-medium">{cat.name}</span>
                   <span className="text-xs px-1.5 py-0.5 rounded-md"
-                    style={{ background: cat.type === 'income' ? '#6B8F7122' : '#C26B6B22', color: cat.type === 'income' ? 'var(--sage)' : 'var(--red)' }}>
+                    style={{ background: cat.type === 'income' ? 'var(--sage-soft)' : 'var(--expense-soft)', color: cat.type === 'income' ? 'var(--sage)' : 'var(--expense)' }}>
                     {cat.type === 'income' ? 'доход' : 'расход'}
                   </span>
                 </div>
@@ -197,14 +234,14 @@ export default function Categories({ categories, onAdd, onUpdate, onDelete }: Pr
                   {cat.subcategories.length} подкатегор{cat.subcategories.length === 1 ? 'ия' : cat.subcategories.length < 5 ? 'ии' : 'ий'}
                 </div>
               </div>
-              <div className="flex gap-1">
-                <button onClick={() => toggle(cat.id)} className="p-1.5 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
+              <div className="flex gap-1 flex-shrink-0">
+                <button onClick={() => toggle(cat.id)} aria-label="Показать подкатегории" className="p-2 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
                   {expanded.has(cat.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </button>
-                <button onClick={() => setEditing(cat)} className="p-1.5 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
+                <button onClick={() => setEditing(cat)} aria-label="Редактировать категорию" className="p-2 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
                   <Pencil size={14} style={{ color: 'var(--text-muted)' }} />
                 </button>
-                <button onClick={() => onDelete(cat.id)} className="p-1.5 rounded-lg hover:bg-[var(--red-light)] transition-colors">
+                <button onClick={() => setDeleting(cat)} aria-label="Удалить категорию" className="p-2 rounded-lg hover:bg-[var(--red-light)] transition-colors">
                   <Trash2 size={14} style={{ color: 'var(--red)' }} />
                 </button>
               </div>

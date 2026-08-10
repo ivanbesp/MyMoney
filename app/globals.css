@@ -3,22 +3,92 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg: #F7F6F3;
-  --bg-card: #FAFAF8;
-  --bg-card2: #F0EEE9;
-  --border: #E4E0D8;
-  --text: #2D2D2A;
-  --text-muted: #7A7570;
-  --sage: #6B8F71;
-  --sage-light: #A8C5A0;
-  --red: #C26B6B;
-  --red-light: #F0D0D0;
+/*
+  Палитра «панель»: белые карточки на сером фоне.
+  Каждая переменная обязана существовать в обеих темах — в компонентах
+  не должно быть ни одного захардкоженного цвета.
+*/
+:root,
+[data-theme='light'] {
+  --bg: #F4F5F7;
+  --bg-card: #FFFFFF;
+  --bg-card2: #EEF0F3;
+  --bg-inset: #F8F9FA;
+  --border: #E2E4E8;
+  --border-strong: #D2D6DC;
+
+  --text: #1C1F24;
+  --text-muted: #7C828C;
+  --text-faint: #A8AEB8;
+
+  /* sage — доход и главный акцент, expense — расход, red — опасное действие */
+  --sage: #2F6B4F;
+  --sage-hover: #255740;
+  --sage-soft: #E7F0E9;
+  --sage-on: #FFFFFF;
+
+  --expense: #C2703F;
+  --expense-soft: #F7E9E0;
+
+  --red: #C0453C;
+  --red-light: #FBE9E7;
+
+  --tone-good-bg: #E7F0E9;
+  --tone-good-fg: #2F6B4F;
+  --tone-warning-bg: #F7E9E0;
+  --tone-warning-fg: #A85A26;
+  --tone-info-bg: #E8EEF6;
+  --tone-info-fg: #3A6089;
+
+  --grid: #E2E4E8;
+  --overlay: rgba(20, 22, 26, 0.4);
+  --shadow-card: 0 1px 2px rgba(20, 22, 26, 0.04);
+  --shadow-seg: 0 1px 3px rgba(20, 22, 26, 0.08);
+  --ring: rgba(47, 107, 79, 0.35);
 }
 
-* {
-  box-sizing: border-box;
+[data-theme='dark'] {
+  --bg: #14161A;
+  --bg-card: #1C1F25;
+  --bg-card2: #23272E;
+  --bg-inset: #191C21;
+  --border: #2C3138;
+  --border-strong: #3A4048;
+
+  --text: #E8EAED;
+  --text-muted: #9198A3;
+  --text-faint: #6B7280;
+
+  --sage: #5FAF80;
+  --sage-hover: #74C094;
+  --sage-soft: #1E3328;
+  --sage-on: #10190F;
+
+  --expense: #E0925F;
+  --expense-soft: #33241A;
+
+  --red: #E0736A;
+  --red-light: #3A211E;
+
+  --tone-good-bg: #1E3328;
+  --tone-good-fg: #7CC79A;
+  --tone-warning-bg: #33241A;
+  --tone-warning-fg: #E0A272;
+  --tone-info-bg: #1B2733;
+  --tone-info-fg: #8AB4DE;
+
+  --grid: #2C3138;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow-card: none;
+  /* На тёмном фоне тень не читается — выделяем активный сегмент рамкой */
+  --shadow-seg: inset 0 0 0 1px var(--border-strong);
+  --ring: rgba(95, 175, 128, 0.45);
 }
+
+* { box-sizing: border-box; }
+
+html { color-scheme: light; }
+[data-theme='dark'] { color-scheme: dark; }
 
 body {
   background-color: var(--bg);
@@ -27,150 +97,184 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
 
-/* Animations */
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes pulse-gentle {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.03); }
+.animate-slide-up { animation: slideUp 0.3s ease-out; }
+.animate-fade-in { animation: fadeIn 0.2s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
-.animate-slide-up {
-  animation: slideUp 0.3s ease-out;
+/*
+  Собственные классы живут в слое components: иначе они объявлены ПОСЛЕ
+  @tailwind utilities и их padding перебивает утилиты вроде pl-9 —
+  из-за этого иконка поиска наезжала на текст.
+*/
+@layer components {
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Плоская вставка внутри карточки — для метрик и вторичных блоков */
+  .tile {
+    background: var(--bg-card2);
+    border-radius: 10px;
+  }
+
+  .input {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    width: 100%;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+
+  .btn-primary {
+    background: var(--sage);
+    color: var(--sage-on);
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn-primary:hover { background: var(--sage-hover); }
+  .btn-primary:active { transform: scale(0.98); }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 18px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .btn-ghost:hover {
+    background: var(--bg-card2);
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.2s ease-out;
-}
-
-.pulse-gentle {
-  animation: pulse-gentle 3s ease-in-out infinite;
-}
-
-/* Custom card style */
-.card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-}
-
-/* Input style */
-.input {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  color: var(--text);
-  width: 100%;
-  transition: border-color 0.15s;
-  outline: none;
-}
+.input::placeholder { color: var(--text-faint); }
 .input:focus {
   border-color: var(--sage);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+/* Иконка нативного date-пикера невидима на тёмном фоне */
+[data-theme='dark'] .input::-webkit-calendar-picker-indicator { filter: invert(0.75); }
+/* У type="search" браузер рисует свой крестик — он бы столкнулся с нашим */
+.input[type='search']::-webkit-search-decoration,
+.input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
-/* Button styles */
-.btn-primary {
-  background: var(--sage);
-  color: white;
-  border: none;
-  border-radius: 10px;
-  padding: 10px 20px;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
-}
-.btn-primary:hover {
-  background: #527358;
-}
-.btn-primary:active {
-  transform: scale(0.98);
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 9px 18px;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-.btn-ghost:hover {
-  background: var(--bg-card2);
-  color: var(--text);
-}
-
-/* Overlay */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.35);
+  background: var(--overlay);
   z-index: 40;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
   animation: fadeIn 0.15s ease;
 }
 
 .modal {
   background: var(--bg-card);
-  border-radius: 20px;
-  padding: 28px;
-  width: min(480px, calc(100vw - 32px));
-  max-height: 90vh;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 24px;
+  width: min(480px, 100%);
+  max-height: 88vh;
   overflow-y: auto;
   animation: slideUp 0.2s ease-out;
 }
 
-/* Number font */
+/* Цифры: моноширинные для выравнивания в столбец */
 .num {
-  font-family: 'DM Serif Display', Georgia, serif;
-  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+/* Одно героическое число на экране — им можно позволить антикву */
+.num-hero {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  font-weight: 500;
 }
 
-/* Period tabs */
-.period-tab {
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 13px;
+/* Чипы периода: равная ширина, текст не переносится */
+.chip {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 7px 4px;
+  border-radius: 20px;
+  font-size: 12px;
   font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
   color: var(--text-muted);
-  background: transparent;
-  border: none;
-  transition: background 0.15s, color 0.15s;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.period-tab.active {
-  background: var(--bg-card2);
-  color: var(--text);
+.chip:hover { color: var(--text); border-color: var(--border-strong); }
+.chip[aria-pressed='true'] {
+  background: var(--sage);
+  color: var(--sage-on);
+  border-color: var(--sage);
 }
-.period-tab:hover:not(.active) {
-  color: var(--text);
+
+/*
+  Действия в строке списка.
+  Скрываем по ховеру только там, где ховер есть: на телефоне его нет,
+  а вкладка нарисована именно под телефон.
+*/
+.row-actions { opacity: 1; transition: opacity 0.15s; }
+
+@media (hover: hover) and (pointer: fine) {
+  .row-actions { opacity: 0; }
+  .row-hover:hover .row-actions,
+  .row-actions:focus-within { opacity: 1; }
+  .row-hover:hover { background: var(--bg-card2); }
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: 2px;
 }
