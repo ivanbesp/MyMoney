@@ -8,6 +8,8 @@ import { todayKey } from '@/lib/dates';
 import { AppData, Period, Settings, Transaction, PiggyBank as PiggyBankType } from '@/lib/types';
 import { ToastProvider, useToast } from '@/lib/toast';
 import { useTheme } from '@/lib/theme';
+import { I18nProvider, useT, LANG_LABELS } from '@/lib/i18n';
+import { useAutoRates } from '@/lib/useAutoRates';
 import TransactionForm from '@/components/TransactionForm';
 import TransactionList from '@/components/TransactionList';
 import Statistics from '@/components/Statistics';
@@ -26,24 +28,7 @@ import {
 type Tab = 'overview' | 'transactions' | 'stats' | 'budgets' | 'piggy'
   | 'categories' | 'accounts' | 'settings';
 
-const PERIOD_LABELS: Record<Period, string> = {
-  day: 'День',
-  week: 'Неделя',
-  month: 'Месяц',
-  year: 'Год',
-  all: 'Всё время',
-};
-
-const TAB_TITLES: Record<Tab, string> = {
-  overview: 'Обзор',
-  transactions: 'Записи',
-  stats: 'Статистика',
-  budgets: 'Бюджеты',
-  piggy: 'Копилки',
-  categories: 'Категории',
-  accounts: 'Счета',
-  settings: 'Настройки',
-};
+const PERIOD_KEYS: Period[] = ['day', 'week', 'month', 'year', 'all'];
 
 /** Экраны, открытые из настроек: у них в шапке стрелка назад */
 const SUB_SCREENS: Tab[] = ['categories', 'accounts'];
@@ -51,19 +36,31 @@ const SUB_SCREENS: Tab[] = ['categories', 'accounts'];
 export default function Page() {
   return (
     <ToastProvider>
-      <App />
+      <LangGate />
     </ToastProvider>
   );
 }
 
-function App() {
+/** Язык нужен выше App, поэтому настройки читаются здесь и прокидываются в провайдер */
+function LangGate() {
+  const settingsApi = useSettings();
+  return (
+    <I18nProvider lang={settingsApi.settings.lang}>
+      <App settingsApi={settingsApi} />
+    </I18nProvider>
+  );
+}
+
+function App({ settingsApi }: { settingsApi: ReturnType<typeof useSettings> }) {
   const toast = useToast();
-  const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
+  const { t, plural } = useT();
+  const { settings, saveSettings, loaded: settingsLoaded } = settingsApi;
   const resolvedTheme = useTheme(settings.theme);
+  useAutoRates(settings, saveSettings, settingsLoaded);
 
   const onStorageError = useCallback(
-    (message: string) => toast.show(message, { tone: 'error', duration: 8000 }),
-    [toast],
+    (key: string) => toast.show(t(key), { tone: 'error', duration: 8000 }),
+    [toast, t],
   );
 
   // Данные грузим только после настроек: миграция проставляет в старые
@@ -87,10 +84,10 @@ function App() {
   // это спокойнее, чем подтверждение на каждый чих.
   const handleDeleteTransaction = useCallback((tx: Transaction) => {
     deleteTransaction(tx.id);
-    toast.show('Запись удалена', {
-      action: { label: 'Отменить', onClick: () => addTransaction(tx) },
+    toast.show(t('list.deleted'), {
+      action: { label: t('common.undo'), onClick: () => addTransaction(tx) },
     });
-  }, [deleteTransaction, addTransaction, toast]);
+  }, [deleteTransaction, addTransaction, toast, t]);
 
   // Повтор: та же категория и сумма, но сегодняшняя дата и сегодняшний курс —
   // это новая трата, а не копия старой
@@ -104,10 +101,10 @@ function App() {
       piggyBankId: undefined,
     };
     addTransaction(copy);
-    toast.show('Запись повторена сегодняшним числом', {
-      action: { label: 'Отменить', onClick: () => deleteTransaction(copy.id) },
+    toast.show(t('list.repeated'), {
+      action: { label: t('common.undo'), onClick: () => deleteTransaction(copy.id) },
     });
-  }, [addTransaction, deleteTransaction, settings.rates, toast]);
+  }, [addTransaction, deleteTransaction, settings.rates, toast, t]);
 
   // Движение денег в копилку и обратно теперь попадает в баланс и статистику
   const handlePiggyMovement = useCallback((pb: PiggyBankType, amount: number, mode: 'add' | 'withdraw') => {
@@ -128,10 +125,10 @@ function App() {
       piggyBankId: pb.id,
     };
     addTransaction(tx);
-    toast.show(isDeposit ? 'Пополнение записано в расходы' : 'Снятие записано в доходы', {
-      action: { label: 'Отменить', onClick: () => deleteTransaction(tx.id) },
+    toast.show(isDeposit ? t('piggy.recordedExpense') : t('piggy.recordedIncome'), {
+      action: { label: t('common.undo'), onClick: () => deleteTransaction(tx.id) },
     });
-  }, [addTransaction, deleteTransaction, settings.rates, toast, data.accounts]);
+  }, [addTransaction, deleteTransaction, settings.rates, toast, t, data.accounts]);
 
   const handleRestore = useCallback((restored: AppData, restoredSettings?: Settings) => {
     if (restoredSettings) saveSettings(restoredSettings);
@@ -151,11 +148,11 @@ function App() {
   // «Категории» переехали в настройки: это настроечный экран, а не ежедневный,
   // и слот в навигации нужнее бюджетам
   const tabs: { id: Tab; icon: React.ReactNode; label: string }[] = [
-    { id: 'overview', icon: <LayoutDashboard size={20} />, label: 'Обзор' },
-    { id: 'transactions', icon: <List size={20} />, label: 'Записи' },
-    { id: 'stats', icon: <BarChart2 size={20} />, label: 'Отчёты' },
-    { id: 'budgets', icon: <Target size={20} />, label: 'Бюджеты' },
-    { id: 'piggy', icon: <PiggyBank size={20} />, label: 'Копилки' },
+    { id: 'overview', icon: <LayoutDashboard size={20} />, label: t('nav.overview') },
+    { id: 'transactions', icon: <List size={20} />, label: t('nav.transactions') },
+    { id: 'stats', icon: <BarChart2 size={20} />, label: t('nav.stats') },
+    { id: 'budgets', icon: <Target size={20} />, label: t('nav.budgets') },
+    { id: 'piggy', icon: <PiggyBank size={20} />, label: t('nav.piggy') },
   ];
 
   return (
@@ -169,7 +166,7 @@ function App() {
               {SUB_SCREENS.includes(tab) && (
                 <button
                   onClick={() => setTab('settings')}
-                  aria-label="Назад в настройки"
+                  aria-label={t('common.back')}
                   className="p-1.5 -ml-1.5 rounded-lg flex-shrink-0"
                   style={{ color: 'var(--text-muted)' }}
                 >
@@ -177,12 +174,24 @@ function App() {
                 </button>
               )}
               <div className="min-w-0">
-                <h1 className="font-medium text-lg truncate" style={{ letterSpacing: '-0.02em' }}>{TAB_TITLES[tab]}</h1>
+                <h1 className="font-medium text-lg truncate" style={{ letterSpacing: '-0.02em' }}>{t(`nav.${tab}`)}</h1>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {data.transactions.length} записей
+                  {plural(data.transactions.length, 'records')}
                 </p>
               </div>
             </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Переключатель языка мини-кнопкой: целая карточка в настройках
+                съедала экран ради двух вариантов */}
+            <button
+              onClick={() => saveSettings({ ...settings, lang: settings.lang === 'ru' ? 'en' : 'ru' })}
+              className="px-2.5 py-2 rounded-xl text-xs font-medium transition-colors"
+              style={{ color: 'var(--text-muted)', minWidth: 40 }}
+              aria-label={`${t('settings.language')}: ${LANG_LABELS[settings.lang === 'ru' ? 'en' : 'ru']}`}
+              title={t('settings.languageHint')}
+            >
+              {settings.lang.toUpperCase()}
+            </button>
             <button
               onClick={() => setTab(tab === 'settings' ? 'overview' : 'settings')}
               className="p-2.5 rounded-xl transition-colors flex-shrink-0"
@@ -190,17 +199,18 @@ function App() {
                 background: tab === 'settings' ? 'var(--bg-card2)' : 'transparent',
                 color: tab === 'settings' ? 'var(--sage)' : 'var(--text-muted)',
               }}
-              aria-label="Настройки"
-              title="Настройки"
+              aria-label={t('nav.settings')}
+              title={t('nav.settings')}
             >
               <SettingsIcon size={19} />
             </button>
+            </div>
           </div>
           {showPeriod && (
             <div className="flex gap-1.5 pb-3">
-              {(Object.keys(PERIOD_LABELS) as Period[]).map(p => (
+              {PERIOD_KEYS.map(p => (
                 <button key={p} onClick={() => setPeriod(p)} className="chip" aria-pressed={period === p}>
-                  {PERIOD_LABELS[p]}
+                  {t(`period.${p}`)}
                 </button>
               ))}
             </div>
@@ -215,7 +225,7 @@ function App() {
               transactions={data.transactions}
               categories={data.categories}
               period={period}
-              periodLabel={PERIOD_LABELS[period].toLowerCase()}
+              periodLabel={t(`period.${period}`).toLowerCase()}
               settings={settings}
             />
 
@@ -239,9 +249,9 @@ function App() {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <h2 className="text-sm font-medium">Последние записи</h2>
+                <h2 className="text-sm font-medium">{t('list.recent')}</h2>
                 <button onClick={() => setTab('transactions')} className="text-xs" style={{ color: 'var(--sage)' }}>
-                  Все →
+                  {t('common.seeAll')}
                 </button>
               </div>
               <TransactionList
@@ -359,7 +369,7 @@ function App() {
       {(tab === 'overview' || tab === 'transactions') && (
         <button
           onClick={() => setShowForm(true)}
-          aria-label="Добавить запись"
+          aria-label={t('form.newRecord')}
           className="fixed right-5 bottom-24 w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center transition-transform active:scale-95 z-20"
           style={{ background: 'var(--sage)', color: 'white', boxShadow: '0 4px 20px rgba(107,143,113,0.4)' }}
         >

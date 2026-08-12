@@ -7,6 +7,7 @@ import { formatMoney, convertAmount } from '@/lib/storage';
 import { normalizeDate, parseDay, todayKey } from '@/lib/dates';
 import { PIGGY_EMOJIS, CATEGORY_COLORS } from '@/lib/defaults';
 import ConfirmDialog from './ConfirmDialog';
+import { useT } from '@/lib/i18n';
 import { Plus, X, Pencil, Trash2, PlusCircle } from 'lucide-react';
 import { differenceInCalendarDays } from 'date-fns';
 
@@ -26,6 +27,7 @@ function PiggyForm({ initial, settings, onSave, onClose }: {
   onSave: (pb: PiggyBank) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [name, setName] = useState(initial?.name ?? '');
   const [target, setTarget] = useState(initial ? String(initial.targetAmount) : '');
   const [targetCurrency, setTargetCurrency] = useState<Currency>(initial?.targetCurrency ?? settings.baseCurrency);
@@ -44,9 +46,9 @@ function PiggyForm({ initial, settings, onSave, onClose }: {
   const handleSave = () => {
     const targetNum = Number(target);
     const currentNum = Number(current);
-    if (!name.trim()) { setError('Введите название'); return; }
-    if (!Number.isFinite(targetNum) || targetNum <= 0) { setError('Введите цель больше нуля'); return; }
-    if (!Number.isFinite(currentNum) || currentNum < 0) { setError('Накоплено не может быть отрицательным'); return; }
+    if (!name.trim()) { setError(t('accounts.errName')); return; }
+    if (!Number.isFinite(targetNum) || targetNum <= 0) { setError(t('piggy.errTarget')); return; }
+    if (!Number.isFinite(currentNum) || currentNum < 0) { setError(t('piggy.errCurrent')); return; }
     onSave({
       id: initial?.id ?? uuidv4(),
       name: name.trim(),
@@ -67,17 +69,17 @@ function PiggyForm({ initial, settings, onSave, onClose }: {
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold">{initial ? 'Редактировать копилку' : 'Новая копилка'}</h2>
+          <h2 className="text-lg font-semibold">{initial ? t('piggy.editGoal') : t('piggy.new')}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-card2)] transition-colors"><X size={18} /></button>
         </div>
 
         <div className="mb-3">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Название</label>
-          <input className="input" placeholder="На отпуск..." value={name} onChange={e => { setName(e.target.value); setError(''); }} autoFocus />
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('piggy.name')}</label>
+          <input className="input" placeholder={t('piggy.namePlaceholder')} value={name} onChange={e => { setName(e.target.value); setError(''); }} autoFocus />
         </div>
 
         <div className="mb-3">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Валюта копилки</label>
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('piggy.currency')}</label>
           <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--bg-card2)' }}>
             {CURRENCIES.map(c => (
               <button key={c} onClick={() => setTargetCurrency(c)}
@@ -95,13 +97,13 @@ function PiggyForm({ initial, settings, onSave, onClose }: {
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>
-              Цель ({CURRENCY_SYMBOLS[targetCurrency]})
+              {t('piggy.target', { sym: CURRENCY_SYMBOLS[targetCurrency] })}
             </label>
             <input className="input num" type="number" placeholder="100 000" value={target} onChange={e => setTarget(e.target.value)} />
           </div>
           <div>
             <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>
-              Уже накоплено ({CURRENCY_SYMBOLS[targetCurrency]})
+              {t('piggy.current', { sym: CURRENCY_SYMBOLS[targetCurrency] })}
             </label>
             <input className="input num" type="number" placeholder="0" value={current} onChange={e => setCurrent(e.target.value)} />
           </div>
@@ -109,17 +111,17 @@ function PiggyForm({ initial, settings, onSave, onClose }: {
 
         {targetCurrency !== settings.baseCurrency && Number(target) > 0 && (
           <p className="text-xs mb-3 -mt-1.5" style={{ color: 'var(--text-muted)' }}>
-            ≈ {formatMoney(convertAmount(Number(target), targetCurrency, settings.baseCurrency, settings.rates), settings.baseCurrency)} по текущему курсу
+            {t('piggy.byRate', { value: formatMoney(convertAmount(Number(target), targetCurrency, settings.baseCurrency, settings.rates), settings.baseCurrency) })}
           </p>
         )}
 
         <div className="mb-3">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Срок (необязательно)</label>
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('piggy.deadline', { optional: t('common.optional') })}</label>
           <input className="input" type="date" min={todayKey()} value={deadline} onChange={e => setDeadline(e.target.value)} />
         </div>
 
         <div className="mb-3">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Иконка</label>
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('piggy.icon')}</label>
           <div className="flex flex-wrap gap-1.5">
             {PIGGY_EMOJIS.map(e => (
               <button key={e} onClick={() => setEmoji(e)}
@@ -131,7 +133,7 @@ function PiggyForm({ initial, settings, onSave, onClose }: {
         </div>
 
         <div className="mb-5">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Цвет</label>
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('piggy.color')}</label>
           <div className="flex flex-wrap gap-1.5">
             {CATEGORY_COLORS.map(c => (
               <button key={c} onClick={() => setColor(c)}
@@ -144,8 +146,8 @@ function PiggyForm({ initial, settings, onSave, onClose }: {
 
         {error && <p className="text-sm mb-3" style={{ color: 'var(--red)' }}>{error}</p>}
         <div className="flex gap-2">
-          <button className="btn-ghost flex-1" onClick={onClose}>Отмена</button>
-          <button className="btn-primary flex-1" onClick={handleSave}>{initial ? 'Сохранить' : 'Создать'}</button>
+          <button className="btn-ghost flex-1" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="btn-primary flex-1" onClick={handleSave}>{initial ? t('common.save') : t('common.create')}</button>
         </div>
       </div>
     </div>
@@ -158,6 +160,7 @@ function DepositModal({ pb, onSave, onRecord, onClose }: {
   onRecord: (pb: PiggyBank, amount: number, mode: 'add' | 'withdraw') => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [amount, setAmount] = useState('');
   const [mode, setMode] = useState<'add' | 'withdraw'>('add');
   // Раньше копилки жили отдельно от баланса: деньги «уходили» в цель,
@@ -173,7 +176,7 @@ function DepositModal({ pb, onSave, onRecord, onClose }: {
 
   const handle = () => {
     const n = Number(amount);
-    if (!Number.isFinite(n) || n <= 0) { setError('Введите сумму больше нуля'); return; }
+    if (!Number.isFinite(n) || n <= 0) { setError(t('accounts.errAmount')); return; }
     // При снятии больше, чем накоплено, в историю пишем ровно снятое
     const applied = mode === 'add' ? n : Math.min(n, pb.currentAmount);
     const newAmt = mode === 'add' ? pb.currentAmount + n : Math.max(0, pb.currentAmount - n);
@@ -199,7 +202,7 @@ function DepositModal({ pb, onSave, onRecord, onClose }: {
                 border: `1px solid ${mode === m ? 'var(--border)' : 'transparent'}`,
               }}
             >
-              {m === 'add' ? '+ Пополнить' : '− Снять'}
+              {m === 'add' ? t('piggy.deposit') : t('piggy.withdraw')}
             </button>
           ))}
         </div>
@@ -210,7 +213,7 @@ function DepositModal({ pb, onSave, onRecord, onClose }: {
             min="0"
             step="0.01"
             inputMode="decimal"
-            placeholder="Сумма"
+            placeholder={t('piggy.amount')}
             value={amount}
             onChange={e => { setAmount(e.target.value); setError(''); }}
             onKeyDown={e => e.key === 'Enter' && handle()}
@@ -229,16 +232,14 @@ function DepositModal({ pb, onSave, onRecord, onClose }: {
             style={{ accentColor: 'var(--sage)', width: 16, height: 16 }}
           />
           <span className="text-xs" style={{ color: 'var(--text-muted)', lineHeight: 1.45 }}>
-            {mode === 'add'
-              ? 'Записать как расход «В копилку» — деньги учтутся в балансе и статистике'
-              : 'Записать как доход «Из копилки» — деньги вернутся в баланс'}
+            {mode === 'add' ? t('piggy.recordExpense') : t('piggy.recordIncome')}
           </span>
         </label>
 
         {error && <p className="text-sm mb-3" style={{ color: 'var(--red)' }}>{error}</p>}
         <div className="flex gap-2">
-          <button className="btn-ghost flex-1" onClick={onClose}>Отмена</button>
-          <button className="btn-primary flex-1" onClick={handle}>Применить</button>
+          <button className="btn-ghost flex-1" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="btn-primary flex-1" onClick={handle}>{t('piggy.apply')}</button>
         </div>
       </div>
     </div>
@@ -246,6 +247,7 @@ function DepositModal({ pb, onSave, onRecord, onClose }: {
 }
 
 export default function PiggyBanks({ piggyBanks, settings, onAdd, onUpdate, onDelete, onRecordMovement }: Props) {
+  const { t } = useT();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<PiggyBank | null>(null);
   const [depositing, setDepositing] = useState<PiggyBank | null>(null);
@@ -269,21 +271,21 @@ export default function PiggyBanks({ piggyBanks, settings, onAdd, onUpdate, onDe
       )}
       {deleting && (
         <ConfirmDialog
-          title={`Удалить копилку «${deleting.name}»?`}
-          description={<>Накоплено {formatMoney(deleting.currentAmount, deleting.currentCurrency)}. Это действие нельзя отменить.</>}
+          title={t('piggy.deleteTitle', { name: deleting.name })}
+          description={t('piggy.deleteHint', { value: formatMoney(deleting.currentAmount, deleting.currentCurrency) })}
           onConfirm={() => onDelete(deleting.id)}
           onClose={() => setDeleting(null)}
         />
       )}
 
       <button onClick={() => setShowForm(true)} className="btn-primary w-full flex items-center justify-center gap-2">
-        <Plus size={16} /> Новая копилка
+        <Plus size={16} /> {t('piggy.new')}
       </button>
 
       {piggyBanks.length === 0 && (
         <div className="card p-8 text-center">
           <div className="text-3xl mb-2">🐷</div>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Создайте первую копилку для вашей цели</p>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('piggy.emptyHint')}</p>
         </div>
       )}
 
@@ -309,19 +311,19 @@ export default function PiggyBanks({ piggyBanks, settings, onAdd, onUpdate, onDe
                     <div className="font-medium text-sm">{pb.name}</div>
                     {pb.deadline && (
                       <div className="text-xs" style={{ color: daysLeft !== null && daysLeft < 30 ? 'var(--red)' : 'var(--text-muted)' }}>
-                        {daysLeft !== null && daysLeft >= 0 ? `${daysLeft} дн. осталось` : daysLeft !== null ? 'Срок прошёл' : ''}
+                        {daysLeft !== null && daysLeft >= 0 ? t('piggy.daysLeft', { n: daysLeft }) : daysLeft !== null ? t('piggy.overdue') : ''}
                       </div>
                     )}
                   </div>
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
-                  <button onClick={() => setDepositing(pb)} aria-label="Пополнить копилку" className="p-2 rounded-lg hover:bg-[var(--bg-card2)] transition-colors" title="Пополнить">
+                  <button onClick={() => setDepositing(pb)} aria-label={t('piggy.topUp')} className="p-2 rounded-lg hover:bg-[var(--bg-card2)] transition-colors" title={t('piggy.topUp')}>
                     <PlusCircle size={14} style={{ color: 'var(--sage)' }} />
                   </button>
-                  <button onClick={() => setEditing(pb)} aria-label="Редактировать копилку" className="p-2 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
+                  <button onClick={() => setEditing(pb)} aria-label={t('piggy.editGoal')} className="p-2 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
                     <Pencil size={14} style={{ color: 'var(--text-muted)' }} />
                   </button>
-                  <button onClick={() => setDeleting(pb)} aria-label="Удалить копилку" className="p-2 rounded-lg hover:bg-[var(--red-light)] transition-colors">
+                  <button onClick={() => setDeleting(pb)} aria-label={t('common.delete')} className="p-2 rounded-lg hover:bg-[var(--red-light)] transition-colors">
                     <Trash2 size={14} style={{ color: 'var(--red)' }} />
                   </button>
                 </div>
@@ -335,7 +337,7 @@ export default function PiggyBanks({ piggyBanks, settings, onAdd, onUpdate, onDe
 
               <div className="flex justify-between items-center">
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {formatMoney(pb.currentAmount, pb.currentCurrency)} из {formatMoney(pb.targetAmount, pb.targetCurrency)}
+                  {t('piggy.of', { current: formatMoney(pb.currentAmount, pb.currentCurrency), target: formatMoney(pb.targetAmount, pb.targetCurrency) })}
                   {isForeign && (
                     <span className="block mt-0.5">
                       ≈ {formatMoney(convertAmount(pb.currentAmount, pb.currentCurrency, settings.baseCurrency, settings.rates), settings.baseCurrency)}
@@ -345,7 +347,7 @@ export default function PiggyBanks({ piggyBanks, settings, onAdd, onUpdate, onDe
                   )}
                 </span>
                 <span className="text-xs font-medium num flex-shrink-0 ml-2" style={{ color: done ? 'var(--sage)' : pb.color }}>
-                  {done ? '✓ Готово!' : `${Math.round(pct)}%`}
+                  {done ? t('piggy.done') : `${Math.round(pct)}%`}
                 </span>
               </div>
             </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, ReactNode } from 'react';
+import { useT } from '@/lib/i18n';
 
 interface Props {
   title: string;
@@ -13,9 +14,10 @@ interface Props {
 }
 
 export default function ConfirmDialog({
-  title, description, confirmLabel = 'Удалить', cancelLabel = 'Отмена',
+  title, description, confirmLabel, cancelLabel,
   danger = true, onConfirm, onClose,
 }: Props) {
+  const { t } = useT();
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -35,13 +37,13 @@ export default function ConfirmDialog({
           </div>
         )}
         <div className="flex gap-2">
-          <button ref={cancelRef} className="btn-ghost flex-1" onClick={onClose}>{cancelLabel}</button>
+          <button ref={cancelRef} className="btn-ghost flex-1" onClick={onClose}>{cancelLabel ?? t('common.cancel')}</button>
           <button
             className="btn-primary flex-1"
             style={danger ? { background: 'var(--red)' } : undefined}
             onClick={() => { onConfirm(); onClose(); }}
           >
-            {confirmLabel}
+            {confirmLabel ?? t('confirm.delete')}
           </button>
         </div>
       </div>

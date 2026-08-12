@@ -8,6 +8,7 @@ import {
 } from '@/lib/types';
 import { formatMoney, convertAmount, rateFor } from '@/lib/storage';
 import { todayKey, normalizeDate } from '@/lib/dates';
+import { useT } from '@/lib/i18n';
 import { X } from 'lucide-react';
 
 interface Props {
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export default function TransactionForm({ categories, accounts, settings, onAdd, onClose, initial }: Props) {
+  const { t } = useT();
   const [type, setType] = useState<TransactionType>(initial?.type ?? 'expense');
   const [amount, setAmount] = useState(initial ? String(initial.amount) : '');
   const [accountId, setAccountId] = useState(initial?.accountId ?? accounts[0]?.id ?? '');
@@ -61,15 +63,15 @@ export default function TransactionForm({ categories, accounts, settings, onAdd,
     const pairRate = convertAmount(1, currency, settings.baseCurrency, settings.rates);
     return {
       approx: `≈ ${formatMoney(converted, settings.baseCurrency)}`,
-      rate: `курс: 1 ${CURRENCY_SYMBOLS[currency]} = ${formatMoney(pairRate, settings.baseCurrency)}`,
+      rate: t('form.rateHint', { sym: CURRENCY_SYMBOLS[currency], value: formatMoney(pairRate, settings.baseCurrency) }),
     };
   })();
 
   const handleSubmit = () => {
-    if (!amountValid) { setError('Введите корректную сумму'); return; }
-    if (!categoryId) { setError('Выберите категорию'); return; }
-    if (!accountId) { setError('Выберите счёт'); return; }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { setError('Укажите дату'); return; }
+    if (!amountValid) { setError(t('form.errAmount')); return; }
+    if (!categoryId) { setError(t('form.errCategory')); return; }
+    if (!accountId) { setError(t('form.errAccount')); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { setError(t('form.errDate')); return; }
 
     onAdd({
       id: initial?.id ?? uuidv4(),
@@ -89,37 +91,38 @@ export default function TransactionForm({ categories, accounts, settings, onAdd,
 
   return (
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={initial ? 'Редактировать запись' : 'Новая запись'}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={initial ? t('form.editRecord') : t('form.newRecord')}>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold">{initial ? 'Редактировать' : 'Новая запись'}</h2>
-          <button onClick={onClose} aria-label="Закрыть" className="p-1.5 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
+          <h2 className="text-lg font-semibold">{initial ? t('form.editRecord') : t('form.newRecord')}</h2>
+          <button onClick={onClose} aria-label={t('common.close')} className="p-1.5 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
             <X size={18} strokeWidth={2} />
           </button>
         </div>
 
         {/* Type toggle */}
         <div className="flex gap-2 mb-4 p-1 rounded-xl" style={{ background: 'var(--bg-card2)' }}>
-          {(['expense', 'income'] as TransactionType[]).map(t => (
+          {/* переменная цикла названа tt, чтобы не затенять функцию перевода t */}
+          {(['expense', 'income'] as TransactionType[]).map(tt => (
             <button
-              key={t}
-              onClick={() => { setType(t); setCategoryId(''); setSubcategoryId(''); }}
+              key={tt}
+              onClick={() => { setType(tt); setCategoryId(''); setSubcategoryId(''); }}
               className="flex-1 py-2 rounded-lg text-sm font-medium transition-all"
               style={{
-                background: type === t ? 'var(--bg-card)' : 'transparent',
-                color: type === t
-                  ? (t === 'income' ? 'var(--sage)' : 'var(--red)')
+                background: type === tt ? 'var(--bg-card)' : 'transparent',
+                color: type === tt
+                  ? (tt === 'income' ? 'var(--sage)' : 'var(--red)')
                   : 'var(--text-muted)',
-                boxShadow: type === t ? 'var(--shadow-seg)' : 'none',
+                boxShadow: type === tt ? 'var(--shadow-seg)' : 'none',
               }}
             >
-              {t === 'expense' ? '↓ Расход' : '↑ Доход'}
+              {tt === 'expense' ? t('type.expense') : t('type.income')}
             </button>
           ))}
         </div>
 
         {/* Amount + Currency */}
         <div className="mb-3">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Сумма</label>
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('form.amount')}</label>
           <div className="flex gap-2">
             <div className="relative flex-1">
               <input
@@ -162,14 +165,14 @@ export default function TransactionForm({ categories, accounts, settings, onAdd,
           )}
           {currency !== 'RUB' && (
             <p className="text-xs mt-1 pl-1" style={{ color: 'var(--text-muted)' }}>
-              Курс сохранится вместе с записью и не изменится задним числом.
+              {t('form.rateFrozen')}
             </p>
           )}
         </div>
 
         {/* Счёт */}
         <div className="mb-3">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Счёт</label>
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('form.account')}</label>
           <select
             className="input"
             value={accountId}
@@ -191,7 +194,7 @@ export default function TransactionForm({ categories, accounts, settings, onAdd,
 
         {/* Date */}
         <div className="mb-3">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Дата</label>
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('form.date')}</label>
           <input
             className="input"
             type="date"
@@ -203,10 +206,10 @@ export default function TransactionForm({ categories, accounts, settings, onAdd,
 
         {/* Category */}
         <div className="mb-3">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Категория</label>
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('form.category')}</label>
           {filtered.length === 0 ? (
             <p className="text-sm p-3 rounded-xl" style={{ background: 'var(--bg-card2)', color: 'var(--text-muted)' }}>
-              Нет категорий этого типа — создайте её во вкладке «Категории».
+              {t('form.noCategories')}
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-1.5">
@@ -232,13 +235,13 @@ export default function TransactionForm({ categories, accounts, settings, onAdd,
         {/* Subcategory */}
         {selectedCat && selectedCat.subcategories.length > 0 && (
           <div className="mb-3">
-            <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Подкатегория</label>
+            <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('form.subcategory')}</label>
             <select
               className="input"
               value={subcategoryId}
               onChange={e => setSubcategoryId(e.target.value)}
             >
-              <option value="">— не указана —</option>
+              <option value="">{t('form.subcategoryNone')}</option>
               {selectedCat.subcategories.map(sub => (
                 <option key={sub.id} value={sub.id}>{sub.name}</option>
               ))}
@@ -248,11 +251,11 @@ export default function TransactionForm({ categories, accounts, settings, onAdd,
 
         {/* Note */}
         <div className="mb-5">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Заметка (необязательно)</label>
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('form.note', { optional: t('common.optional') })}</label>
           <input
             className="input"
             type="text"
-            placeholder="Добавить заметку..."
+            placeholder={t('form.notePlaceholder')}
             value={note}
             onChange={e => setNote(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
@@ -262,9 +265,9 @@ export default function TransactionForm({ categories, accounts, settings, onAdd,
         {error && <p className="text-sm mb-3" style={{ color: 'var(--red)' }}>{error}</p>}
 
         <div className="flex gap-2">
-          <button className="btn-ghost flex-1" onClick={onClose}>Отмена</button>
+          <button className="btn-ghost flex-1" onClick={onClose}>{t('common.cancel')}</button>
           <button className="btn-primary flex-1" onClick={handleSubmit}>
-            {initial ? 'Сохранить' : 'Добавить'}
+            {initial ? t('common.save') : t('common.add')}
           </button>
         </div>
       </div>

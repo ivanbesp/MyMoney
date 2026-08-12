@@ -3,10 +3,10 @@ import { Account, Category, Currency } from './types';
 /** Счёт, на который переезжают все записи, заведённые до появления счетов */
 export const DEFAULT_ACCOUNT_ID = 'acc-main';
 
-export function makeDefaultAccount(currency: Currency): Account {
+export function makeDefaultAccount(currency: Currency, lang: 'ru' | 'en' = 'ru'): Account {
   return {
     id: DEFAULT_ACCOUNT_ID,
-    name: 'Основной',
+    name: lang === 'en' ? 'Main' : 'Основной',
     kind: 'card',
     currency,
     openingBalance: 0,
@@ -160,6 +160,72 @@ export const DEFAULT_CATEGORIES: Category[] = [
     subcategories: [],
   },
 ];
+
+/**
+ * Английские названия стартового набора.
+ * Переводятся только категории, создаваемые при первом запуске: как только
+ * пользователь их переименует, это уже его данные, и смена языка их не трогает.
+ */
+const EN_NAMES: Record<string, string> = {
+  'cat-food': 'Food',
+  'cat-transport': 'Transport',
+  'cat-home': 'Home',
+  'cat-health': 'Health',
+  'cat-entertainment': 'Fun',
+  'cat-shopping': 'Shopping',
+  'cat-other-expense': 'Other',
+  'cat-salary': 'Salary',
+  'cat-investment': 'Investments',
+  'cat-other-income': 'Other',
+  [SAVINGS_OUT_CATEGORY_ID]: 'To savings',
+  [SAVINGS_IN_CATEGORY_ID]: 'From savings',
+
+  'sub-groceries': 'Groceries',
+  'sub-restaurant': 'Restaurants',
+  'sub-cafe': 'Cafes and coffee',
+  'sub-delivery': 'Delivery',
+  'sub-metro': 'Transit',
+  'sub-taxi': 'Taxi',
+  'sub-car': 'Car',
+  'sub-rent': 'Rent',
+  'sub-utilities': 'Utilities',
+  'sub-internet': 'Internet and phone',
+  'sub-repairs': 'Repairs',
+  'sub-pharmacy': 'Pharmacy',
+  'sub-doctor': 'Doctors',
+  'sub-sport': 'Sport',
+  'sub-cinema': 'Cinema and theatre',
+  'sub-subscriptions': 'Subscriptions',
+  'sub-games': 'Games',
+  'sub-travel': 'Travel',
+  'sub-clothes': 'Clothes',
+  'sub-electronics': 'Electronics',
+  'sub-gifts': 'Gifts',
+  'sub-other-exp': 'Misc',
+  'sub-main-salary': 'Base pay',
+  'sub-bonus': 'Bonus',
+  'sub-freelance': 'Freelance',
+  'sub-dividends': 'Dividends',
+  'sub-interest': 'Interest',
+  'sub-gift-money': 'Gift',
+  'sub-sale': 'Sale',
+  'sub-other-inc': 'Misc',
+};
+
+/** Стартовый набор категорий на языке, выбранном при первом запуске */
+export function makeDefaultCategories(lang: 'ru' | 'en'): Category[] {
+  if (lang === 'ru') return DEFAULT_CATEGORIES;
+  return DEFAULT_CATEGORIES.map(c => ({
+    ...c,
+    name: EN_NAMES[c.id] ?? c.name,
+    subcategories: c.subcategories.map(s => ({ ...s, name: EN_NAMES[s.id] ?? s.name })),
+  }));
+}
+
+/** Название счёта «Основной» на нужном языке */
+export function makeDefaultAccountName(lang: 'ru' | 'en'): string {
+  return lang === 'en' ? 'Main' : 'Основной';
+}
 
 export const CATEGORY_COLORS = [
   '#E8A87C', '#7EB8D4', '#A8C5A0', '#C9A8C5', '#F0C27F',

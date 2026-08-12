@@ -6,6 +6,7 @@ import { filterByPeriod, calcStats, formatMoney, txInBase } from '@/lib/storage'
 import { dayKey } from '@/lib/dates';
 import { subDays, getDate, getDaysInMonth } from 'date-fns';
 import { Lightbulb } from 'lucide-react';
+import { useT } from '@/lib/i18n';
 
 interface Props {
   transactions: Transaction[];
@@ -20,9 +21,10 @@ interface Insight {
 }
 
 export default function Insights({ transactions, categories, settings }: Props) {
+  const { t } = useT();
   const insights = useMemo<Insight[]>(() => {
     if (transactions.length === 0) {
-      return [{ emoji: '👋', text: 'Начните добавлять записи, чтобы увидеть аналитику', type: 'info' }];
+      return [{ emoji: '👋', text: t('insights.start'), type: 'info' }];
     }
 
     const result: Insight[] = [];
@@ -32,11 +34,11 @@ export default function Insights({ transactions, categories, settings }: Props) 
     // Норма сбережений
     if (income > 0) {
       const saving = ((income - expense) / income) * 100;
-      if (saving >= 20) result.push({ emoji: '🌟', text: `Вы откладываете ${Math.round(saving)}% от дохода. Отлично!`, type: 'good' });
-      else if (saving > 0) result.push({ emoji: '💡', text: `Попробуйте откладывать больше 20% — сейчас ${Math.round(saving)}%`, type: 'info' });
-      else result.push({ emoji: '⚠️', text: `Расходы превышают доходы на ${formatMoney(expense - income, settings.baseCurrency)} в этом месяце`, type: 'warning' });
+      if (saving >= 20) result.push({ emoji: '🌟', text: t('insights.savingGood', { pct: Math.round(saving) }), type: 'good' });
+      else if (saving > 0) result.push({ emoji: '💡', text: t('insights.savingLow', { pct: Math.round(saving) }), type: 'info' });
+      else result.push({ emoji: '⚠️', text: t('insights.overspend', { value: formatMoney(expense - income, settings.baseCurrency) }), type: 'warning' });
     } else if (expense > 0) {
-      result.push({ emoji: '⚠️', text: `За этот месяц потрачено ${formatMoney(expense, settings.baseCurrency)}, доходов не записано`, type: 'warning' });
+      result.push({ emoji: '⚠️', text: t('insights.noIncome', { value: formatMoney(expense, settings.baseCurrency) }), type: 'warning' });
     }
 
     // Самая тяжёлая категория расходов
@@ -50,7 +52,7 @@ export default function Insights({ transactions, categories, settings }: Props) 
       const cat = categories.find(c => c.id === topCat[0]);
       const pct = Math.round((topCat[1] / expense) * 100);
       if (pct > 40) {
-        result.push({ emoji: cat?.icon ?? '📊', text: `«${cat?.name ?? 'Без категории'}» забирает ${pct}% всех расходов`, type: 'warning' });
+        result.push({ emoji: cat?.icon ?? '📊', text: t('insights.topCat', { name: cat?.name ?? t('list.noCategory'), pct }), type: 'warning' });
       }
     }
 
@@ -63,7 +65,7 @@ export default function Insights({ transactions, categories, settings }: Props) 
       if (days.has(dayKey(subDays(now, i)))) streak++;
       else break;
     }
-    if (streak >= 7) result.push({ emoji: '🔥', text: `${streak} дней подряд ведёте учёт. Так держать!`, type: 'good' });
+    if (streak >= 7) result.push({ emoji: '🔥', text: t('insights.streak', { n: streak }), type: 'good' });
 
     // Прогноз до конца месяца
     const daysPassed = getDate(now);
@@ -72,7 +74,7 @@ export default function Insights({ transactions, categories, settings }: Props) 
       if (income > 0 && projected > income) {
         result.push({
           emoji: '📈',
-          text: `При текущем темпе к концу месяца расходы составят ~${formatMoney(Math.round(projected), settings.baseCurrency)}`,
+          text: t('insights.projection', { value: formatMoney(Math.round(projected), settings.baseCurrency) }),
           type: 'warning',
         });
       }
@@ -84,23 +86,23 @@ export default function Insights({ transactions, categories, settings }: Props) 
       const currencies = Array.from(new Set(foreign.map(t => t.currency)));
       result.push({
         emoji: '💱',
-        text: `${foreign.length} операций в ${currencies.join(' и ')} в этом месяце — проверьте, актуален ли курс в настройках`,
+        text: t('insights.foreign', { n: foreign.length, currencies: currencies.join(', ') }),
         type: 'info',
       });
     }
 
     if (result.length === 0) {
-      result.push({ emoji: '✅', text: 'Финансы в порядке. Продолжайте вести учёт!', type: 'good' });
+      result.push({ emoji: '✅', text: t('insights.allGood'), type: 'good' });
     }
 
     return result.slice(0, 2);
-  }, [transactions, categories, settings]);
+  }, [transactions, categories, settings, t]);
 
   return (
     <div>
       <div className="flex items-center gap-1.5 mb-2">
         <Lightbulb size={13} style={{ color: 'var(--text-muted)' }} />
-        <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Инсайты</span>
+        <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('insights.title')}</span>
       </div>
       {/* Раньше каждый инсайт сидел в своей пастельной рамке — три цветных
           прямоугольника подряд спорили с палитрой. Хватает цветной иконки. */}

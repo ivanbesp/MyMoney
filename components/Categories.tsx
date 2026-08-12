@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Category, Subcategory, Transaction, TransactionType } from '@/lib/types';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from '@/lib/defaults';
 import ConfirmDialog from './ConfirmDialog';
+import { useT } from '@/lib/i18n';
 import { Plus, X, Pencil, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
 
 interface Props {
@@ -20,6 +21,7 @@ function CategoryForm({ initial, onSave, onClose }: {
   onSave: (cat: Category) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [name, setName] = useState(initial?.name ?? '');
   const [type, setType] = useState<TransactionType>(initial?.type ?? 'expense');
   const [color, setColor] = useState(initial?.color ?? CATEGORY_COLORS[0]);
@@ -33,7 +35,7 @@ function CategoryForm({ initial, onSave, onClose }: {
   }, [onClose]);
 
   const handleSave = () => {
-    if (!name.trim()) { setError('Введите название'); return; }
+    if (!name.trim()) { setError(t('accounts.errName')); return; }
     onSave({
       id: initial?.id ?? uuidv4(),
       name: name.trim(),
@@ -49,32 +51,33 @@ function CategoryForm({ initial, onSave, onClose }: {
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold">{initial ? 'Редактировать' : 'Новая категория'}</h2>
+          <h2 className="text-lg font-semibold">{initial ? t('common.edit') : t('cats.new')}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-card2)] transition-colors"><X size={18} /></button>
         </div>
 
         {!initial && (
           <div className="flex gap-2 mb-4 p-1 rounded-xl" style={{ background: 'var(--bg-card2)' }}>
-            {(['expense', 'income'] as TransactionType[]).map(t => (
-              <button key={t} onClick={() => setType(t)}
+            {/* переменная цикла tt, чтобы не затенять функцию перевода */}
+            {(['expense', 'income'] as TransactionType[]).map(tt => (
+              <button key={tt} onClick={() => setType(tt)}
                 className="flex-1 py-2 rounded-lg text-sm font-medium transition-all"
                 style={{
-                  background: type === t ? 'var(--bg-card)' : 'transparent',
-                  color: type === t ? (t === 'income' ? 'var(--sage)' : 'var(--red)') : 'var(--text-muted)',
-                  boxShadow: type === t ? 'var(--shadow-seg)' : 'none',
+                  background: type === tt ? 'var(--bg-card)' : 'transparent',
+                  color: type === tt ? (tt === 'income' ? 'var(--sage)' : 'var(--red)') : 'var(--text-muted)',
+                  boxShadow: type === tt ? 'var(--shadow-seg)' : 'none',
                 }}
-              >{t === 'expense' ? '↓ Расход' : '↑ Доход'}</button>
+              >{tt === 'expense' ? t('type.expense') : t('type.income')}</button>
             ))}
           </div>
         )}
 
         <div className="mb-3">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Название</label>
-          <input className="input" value={name} onChange={e => { setName(e.target.value); setError(''); }} autoFocus placeholder="Название категории" />
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('cats.name')}</label>
+          <input className="input" value={name} onChange={e => { setName(e.target.value); setError(''); }} autoFocus placeholder={t('cats.namePlaceholder')} />
         </div>
 
         <div className="mb-3">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Иконка</label>
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('cats.icon')}</label>
           <div className="flex flex-wrap gap-1.5">
             {CATEGORY_ICONS.map(ic => (
               <button key={ic} onClick={() => setIcon(ic)}
@@ -86,7 +89,7 @@ function CategoryForm({ initial, onSave, onClose }: {
         </div>
 
         <div className="mb-5">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Цвет</label>
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('cats.color')}</label>
           <div className="flex flex-wrap gap-1.5">
             {CATEGORY_COLORS.map(c => (
               <button key={c} onClick={() => setColor(c)}
@@ -99,8 +102,8 @@ function CategoryForm({ initial, onSave, onClose }: {
 
         {error && <p className="text-sm mb-3" style={{ color: 'var(--red)' }}>{error}</p>}
         <div className="flex gap-2">
-          <button className="btn-ghost flex-1" onClick={onClose}>Отмена</button>
-          <button className="btn-primary flex-1" onClick={handleSave}>{initial ? 'Сохранить' : 'Создать'}</button>
+          <button className="btn-ghost flex-1" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="btn-primary flex-1" onClick={handleSave}>{initial ? t('common.save') : t('common.create')}</button>
         </div>
       </div>
     </div>
@@ -108,6 +111,7 @@ function CategoryForm({ initial, onSave, onClose }: {
 }
 
 function SubcategoryManager({ cat, onUpdate }: { cat: Category; onUpdate: (cat: Category) => void }) {
+  const { t } = useT();
   const [newName, setNewName] = useState('');
 
   const addSub = () => {
@@ -126,7 +130,7 @@ function SubcategoryManager({ cat, onUpdate }: { cat: Category; onUpdate: (cat: 
       <div className="flex gap-2 mb-2">
         <input
           className="input text-sm py-1.5"
-          placeholder="Новая подкатегория..."
+          placeholder={t('cats.newSub')}
           value={newName}
           onChange={e => setNewName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && addSub()}
@@ -138,7 +142,7 @@ function SubcategoryManager({ cat, onUpdate }: { cat: Category; onUpdate: (cat: 
           <span className="text-sm" style={{ color: 'var(--text-muted)' }}>• {sub.name}</span>
           <button
             onClick={() => deleteSub(sub.id)}
-            aria-label={`Удалить подкатегорию ${sub.name}`}
+            aria-label={t('cats.deleteSub', { name: sub.name })}
             className="row-actions p-1.5 rounded-lg hover:bg-[var(--red-light)] transition-all"
           >
             <Trash2 size={12} style={{ color: 'var(--red)' }} />
@@ -150,6 +154,7 @@ function SubcategoryManager({ cat, onUpdate }: { cat: Category; onUpdate: (cat: 
 }
 
 export default function Categories({ categories, transactions, onAdd, onUpdate, onDelete }: Props) {
+  const { t, plural } = useT();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [deleting, setDeleting] = useState<Category | null>(null);
@@ -179,15 +184,12 @@ export default function Categories({ categories, transactions, onAdd, onUpdate, 
       {editing && <CategoryForm initial={editing} onSave={onUpdate} onClose={() => setEditing(null)} />}
       {deleting && (
         <ConfirmDialog
-          title={`Удалить «${deleting.name}»?`}
+          title={t('cats.deleteTitle', { name: deleting.name })}
           description={
             (usage.get(deleting.id) ?? 0) > 0 ? (
-              <>
-                На эту категорию ссылаются <strong>{usage.get(deleting.id)}</strong> записей.
-                Они останутся в истории, но будут показаны как «Без категории».
-              </>
+              <>{t('cats.deleteUsed', { n: usage.get(deleting.id) ?? 0 })}</>
             ) : (
-              'Категория не используется ни в одной записи.'
+              t('cats.deleteEmpty')
             )
           }
           onConfirm={() => onDelete(deleting.id)}
@@ -205,12 +207,12 @@ export default function Categories({ categories, transactions, onAdd, onUpdate, 
                 color: filter === f ? 'var(--text)' : 'var(--text-muted)',
               }}
             >
-              {f === 'all' ? 'Все' : f === 'expense' ? 'Расходы' : 'Доходы'}
+              {f === 'all' ? t('common.all') : f === 'expense' ? t('type.expensePlain') : t('type.incomePlain')}
             </button>
           ))}
         </div>
         <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-1 px-3">
-          <Plus size={15} /> Добавить
+          <Plus size={15} /> {t('common.add')}
         </button>
       </div>
 
@@ -227,21 +229,21 @@ export default function Categories({ categories, transactions, onAdd, onUpdate, 
                   <span className="text-sm font-medium">{cat.name}</span>
                   <span className="text-xs px-1.5 py-0.5 rounded-md"
                     style={{ background: cat.type === 'income' ? 'var(--sage-soft)' : 'var(--expense-soft)', color: cat.type === 'income' ? 'var(--sage)' : 'var(--expense)' }}>
-                    {cat.type === 'income' ? 'доход' : 'расход'}
+                    {cat.type === 'income' ? t('cats.badgeIncome') : t('cats.badgeExpense')}
                   </span>
                 </div>
                 <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {cat.subcategories.length} подкатегор{cat.subcategories.length === 1 ? 'ия' : cat.subcategories.length < 5 ? 'ии' : 'ий'}
+                  {plural(cat.subcategories.length, 'cats.sub')}
                 </div>
               </div>
               <div className="flex gap-1 flex-shrink-0">
-                <button onClick={() => toggle(cat.id)} aria-label="Показать подкатегории" className="p-2 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
+                <button onClick={() => toggle(cat.id)} aria-label={t('cats.showSubs')} className="p-2 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
                   {expanded.has(cat.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </button>
-                <button onClick={() => setEditing(cat)} aria-label="Редактировать категорию" className="p-2 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
+                <button onClick={() => setEditing(cat)} aria-label={t('cats.editCat')} className="p-2 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
                   <Pencil size={14} style={{ color: 'var(--text-muted)' }} />
                 </button>
-                <button onClick={() => setDeleting(cat)} aria-label="Удалить категорию" className="p-2 rounded-lg hover:bg-[var(--red-light)] transition-colors">
+                <button onClick={() => setDeleting(cat)} aria-label={t('cats.deleteCat')} className="p-2 rounded-lg hover:bg-[var(--red-light)] transition-colors">
                   <Trash2 size={14} style={{ color: 'var(--red)' }} />
                 </button>
               </div>

@@ -32,4 +32,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 .test-build
+
+# Резервные копии и выгрузки: это личные финансовые данные,
+# в публичном репозитории им не место
+fintrack-backup-*.json
+fintrack-*.csv
+*.backup.json
 next-env.d.ts

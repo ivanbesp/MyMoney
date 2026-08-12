@@ -11,6 +11,7 @@ import {
   DEFAULT_ACCOUNT_ID, makeDefaultAccount,
 } from './defaults';
 import { normalizeDate, periodRange } from './dates';
+import { getNumberLocale } from './format';
 
 const STORAGE_KEY = 'finance_tracker_data';
 const SETTINGS_KEY = 'finance_tracker_settings';
@@ -104,7 +105,8 @@ export function formatMoney(amount: number, currency: Currency = 'RUB'): string 
   const value = Number.isFinite(amount) ? amount : 0;
   const sym = CURRENCY_SYMBOLS[currency];
   // Копейки показываем только когда они есть: «11 ₽», но «10,5 ₽».
-  const formatted = new Intl.NumberFormat('ru-RU', {
+  // Разделители зависят от языка интерфейса: 1 234,56 против 1,234.56
+  const formatted = new Intl.NumberFormat(getNumberLocale(), {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(value);
@@ -140,9 +142,8 @@ function writeJSON(key: string, value: unknown, onError?: StorageErrorHandler): 
   } catch (e) {
     const quota = e instanceof DOMException &&
       (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED');
-    onError?.(quota
-      ? 'Хранилище переполнено — изменения не сохранены. Выгрузите копию в настройках.'
-      : 'Не удалось сохранить данные. Возможно, браузер блокирует локальное хранилище.');
+    // Отдаём КЛЮЧ перевода: этот модуль не React и про выбранный язык не знает
+    onError?.(quota ? 'storage.quota' : 'storage.failed');
     return false;
   }
 }
@@ -275,6 +276,10 @@ export function useSettings() {
         baseCurrency: stored.baseCurrency ?? DEFAULT_SETTINGS.baseCurrency,
         rates: safeRates(stored.rates),
         theme: THEME_MODES.includes(stored.theme as ThemeMode) ? stored.theme as ThemeMode : 'system',
+        lang: stored.lang === 'en' ? 'en' : 'ru',
+        autoRates: stored.autoRates === true,
+        ratesUpdatedAt: stored.ratesUpdatedAt,
+        ratesSource: stored.ratesSource,
       });
     }
     setLoaded(true);
@@ -285,6 +290,10 @@ export function useSettings() {
       baseCurrency: s.baseCurrency,
       rates: safeRates(s.rates),
       theme: THEME_MODES.includes(s.theme) ? s.theme : 'system',
+      lang: s.lang === 'en' ? 'en' : 'ru',
+      autoRates: s.autoRates === true,
+      ratesUpdatedAt: s.ratesUpdatedAt,
+      ratesSource: s.ratesSource,
     };
     setSettings(normalized);
     writeJSON(SETTINGS_KEY, normalized);
@@ -536,6 +545,10 @@ export function parseBackup(text: string, rates: CurrencyRates): { data: AppData
         baseCurrency: obj.settings.baseCurrency ?? 'RUB',
         rates: safeRates(obj.settings.rates),
         theme: THEME_MODES.includes(obj.settings.theme as ThemeMode) ? obj.settings.theme as ThemeMode : 'system',
+        lang: obj.settings.lang === 'en' ? 'en' : 'ru',
+        autoRates: obj.settings.autoRates === true,
+        ratesUpdatedAt: obj.settings.ratesUpdatedAt,
+        ratesSource: obj.settings.ratesSource,
       }
     : undefined;
   return { data: migrate(obj, settings?.rates ?? rates, settings?.baseCurrency ?? 'RUB'), settings };

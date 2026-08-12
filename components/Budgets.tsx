@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Budget, Category, Currency, CURRENCIES, CURRENCY_SYMBOLS, Settings, Transaction } from '@/lib/types';
 import { budgetProgress, BUDGET_STATE_COLOR, formatMoney, convertAmount } from '@/lib/storage';
 import ConfirmDialog from './ConfirmDialog';
+import { useT } from '@/lib/i18n';
 import { Plus, X, Pencil, Trash2 } from 'lucide-react';
 import { getDate, getDaysInMonth } from 'date-fns';
 
@@ -26,6 +27,7 @@ function BudgetForm({ initial, categories, budgets, settings, onSave, onClose }:
   onSave: (b: Budget) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? '');
   const [amount, setAmount] = useState(initial ? String(initial.amount) : '');
   const [currency, setCurrency] = useState<Currency>(initial?.currency ?? settings.baseCurrency);
@@ -47,8 +49,8 @@ function BudgetForm({ initial, categories, budgets, settings, onSave, onClose }:
     : null;
 
   const handleSave = () => {
-    if (!categoryId) { setError('Выберите категорию'); return; }
-    if (!Number.isFinite(parsed) || parsed <= 0) { setError('Введите лимит больше нуля'); return; }
+    if (!categoryId) { setError(t('form.errCategory')); return; }
+    if (!Number.isFinite(parsed) || parsed <= 0) { setError(t('budgets.errAmount')); return; }
     onSave({
       id: initial?.id ?? uuidv4(),
       categoryId,
@@ -61,19 +63,19 @@ function BudgetForm({ initial, categories, budgets, settings, onSave, onClose }:
 
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={initial ? 'Изменить лимит' : 'Новый лимит'}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={initial ? t('budgets.edit') : t('budgets.new')}>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold">{initial ? 'Изменить лимит' : 'Новый лимит'}</h2>
-          <button onClick={onClose} aria-label="Закрыть" className="p-1.5 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
+          <h2 className="text-lg font-semibold">{initial ? t('budgets.edit') : t('budgets.new')}</h2>
+          <button onClick={onClose} aria-label={t('common.close')} className="p-1.5 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
             <X size={18} />
           </button>
         </div>
 
         <div className="mb-3">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Категория расходов</label>
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('budgets.category')}</label>
           {available.length === 0 && !initial ? (
             <p className="text-sm p-3 rounded-xl" style={{ background: 'var(--bg-card2)', color: 'var(--text-muted)' }}>
-              Для всех категорий расходов лимиты уже заданы.
+              {t('budgets.allTaken')}
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-1.5">
@@ -97,7 +99,7 @@ function BudgetForm({ initial, categories, budgets, settings, onSave, onClose }:
         </div>
 
         <div className="mb-3">
-          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Лимит на месяц</label>
+          <label className="block text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('budgets.monthLimit')}</label>
           <div className="flex gap-2">
             <input
               className="input num text-lg flex-1"
@@ -132,15 +134,15 @@ function BudgetForm({ initial, categories, budgets, settings, onSave, onClose }:
           </div>
           {preview !== null && (
             <p className="text-xs mt-1.5 pl-1" style={{ color: 'var(--text-muted)' }}>
-              ≈ {formatMoney(preview, settings.baseCurrency)} по текущему курсу
+              {t('budgets.byRate', { value: formatMoney(preview, settings.baseCurrency) })}
             </p>
           )}
         </div>
 
         {error && <p className="text-sm mb-3" style={{ color: 'var(--red)' }}>{error}</p>}
         <div className="flex gap-2">
-          <button className="btn-ghost flex-1" onClick={onClose}>Отмена</button>
-          <button className="btn-primary flex-1" onClick={handleSave}>{initial ? 'Сохранить' : 'Создать'}</button>
+          <button className="btn-ghost flex-1" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="btn-primary flex-1" onClick={handleSave}>{initial ? t('common.save') : t('common.create')}</button>
         </div>
       </div>
     </div>
@@ -154,6 +156,7 @@ export function BudgetRow({ budget, category, transactions, settings, compact }:
   settings: Settings;
   compact?: boolean;
 }) {
+  const { t } = useT();
   const p = budgetProgress(budget, transactions, settings);
   const color = BUDGET_STATE_COLOR[p.state];
 
@@ -173,11 +176,11 @@ export function BudgetRow({ budget, category, transactions, settings, compact }:
             {category?.icon ?? '📦'}
           </span>
         )}
-        <span className="text-sm font-medium flex-1 truncate">{category?.name ?? 'Без категории'}</span>
+        <span className="text-sm font-medium flex-1 truncate">{category?.name ?? t('list.noCategory')}</span>
         <span className="text-xs num flex-shrink-0" style={{ color }}>
           {p.state === 'over'
-            ? `превышен на ${formatMoney(-p.remaining, settings.baseCurrency)}`
-            : `осталось ${formatMoney(p.remaining, settings.baseCurrency)}`}
+            ? t('budgets.over', { value: formatMoney(-p.remaining, settings.baseCurrency) })
+            : t('budgets.left', { value: formatMoney(p.remaining, settings.baseCurrency) })}
         </span>
       </div>
 
@@ -190,14 +193,14 @@ export function BudgetRow({ budget, category, transactions, settings, compact }:
 
       <div className="flex justify-between text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
         <span className="num">
-          {formatMoney(p.spent, settings.baseCurrency)} из {formatMoney(p.limit, settings.baseCurrency)}
+          {t('budgets.spentOf', { spent: formatMoney(p.spent, settings.baseCurrency), limit: formatMoney(p.limit, settings.baseCurrency) })}
         </span>
         <span>{Math.round(p.ratio * 100)}%</span>
       </div>
 
       {tooFast && (
         <p className="text-xs mt-1" style={{ color: 'var(--expense)' }}>
-          Темп выше обычного — к концу месяца лимит может не сойтись
+          {t('budgets.tooFast')}
         </p>
       )}
     </div>
@@ -212,6 +215,7 @@ export function BudgetSummary({ budgets, categories, transactions, settings, onO
   settings: Settings;
   onOpen: () => void;
 }) {
+  const { t } = useT();
   const top = useMemo(() => {
     return [...budgets]
       .map(b => ({ b, p: budgetProgress(b, transactions, settings) }))
@@ -224,8 +228,8 @@ export function BudgetSummary({ budgets, categories, transactions, settings, onO
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-sm font-medium">Бюджеты</h2>
-        <button onClick={onOpen} className="text-xs" style={{ color: 'var(--sage)' }}>Все →</button>
+        <h2 className="text-sm font-medium">{t('nav.budgets')}</h2>
+        <button onClick={onOpen} className="text-xs" style={{ color: 'var(--sage)' }}>{t('common.seeAll')}</button>
       </div>
       <div className="card px-4">
         {top.map(({ b }, i) => (
@@ -245,6 +249,7 @@ export function BudgetSummary({ budgets, categories, transactions, settings, onO
 }
 
 export default function Budgets({ budgets, categories, transactions, settings, onAdd, onUpdate, onDelete }: Props) {
+  const { t } = useT();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Budget | null>(null);
   const [deleting, setDeleting] = useState<Budget | null>(null);
@@ -276,8 +281,8 @@ export default function Budgets({ budgets, categories, transactions, settings, o
       )}
       {deleting && (
         <ConfirmDialog
-          title={`Удалить лимит «${catById.get(deleting.categoryId)?.name ?? ''}»?`}
-          description="Записи останутся на месте — удалится только лимит."
+          title={t('budgets.deleteTitle', { name: catById.get(deleting.categoryId)?.name ?? '' })}
+          description={t('budgets.deleteHint')}
           onConfirm={() => onDelete(deleting.id)}
           onClose={() => setDeleting(null)}
         />
@@ -286,16 +291,16 @@ export default function Budgets({ budgets, categories, transactions, settings, o
       {budgets.length > 0 && (
         <div className="card p-4">
           <div className="flex justify-between items-baseline mb-2">
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Все лимиты за месяц</span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('budgets.allMonth')}</span>
             <span className="text-xs num" style={{ color: 'var(--text-muted)' }}>
               {Math.round(totals.ratio * 100)}%
             </span>
           </div>
           <div className="num-hero text-2xl mb-2">
-            {formatMoney(totals.spent, settings.baseCurrency)}
-            <span className="text-sm font-normal" style={{ color: 'var(--text-muted)' }}>
-              {' '}из {formatMoney(totals.limit, settings.baseCurrency)}
-            </span>
+            {t('budgets.spentOf', {
+              spent: formatMoney(totals.spent, settings.baseCurrency),
+              limit: formatMoney(totals.limit, settings.baseCurrency),
+            })}
           </div>
           <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-card2)' }}>
             <div
@@ -310,15 +315,15 @@ export default function Budgets({ budgets, categories, transactions, settings, o
       )}
 
       <button onClick={() => setShowForm(true)} className="btn-primary w-full flex items-center justify-center gap-2">
-        <Plus size={16} /> Новый лимит
+        <Plus size={16} /> {t('budgets.new')}
       </button>
 
       {budgets.length === 0 && (
         <div className="card p-8 text-center">
           <div className="text-3xl mb-2">🎯</div>
-          <p className="text-sm mb-1" style={{ color: 'var(--text)' }}>Задайте лимит на месяц</p>
+          <p className="text-sm mb-1" style={{ color: 'var(--text)' }}>{t('budgets.emptyTitle')}</p>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Приложение подскажет, когда расходы по категории подходят к границе.
+            {t('budgets.emptyHint')}
           </p>
         </div>
       )}
@@ -336,11 +341,11 @@ export default function Budgets({ budgets, categories, transactions, settings, o
                 />
               </div>
               <div className="row-actions flex gap-0.5 p-2 flex-shrink-0">
-                <button onClick={() => setEditing(b)} aria-label="Изменить лимит"
+                <button onClick={() => setEditing(b)} aria-label={t('budgets.edit')}
                   className="p-2 rounded-lg hover:bg-[var(--bg-card2)] transition-colors">
                   <Pencil size={14} style={{ color: 'var(--text-muted)' }} />
                 </button>
-                <button onClick={() => setDeleting(b)} aria-label="Удалить лимит"
+                <button onClick={() => setDeleting(b)} aria-label={t('common.delete')}
                   className="p-2 rounded-lg hover:bg-[var(--red-light)] transition-colors">
                   <Trash2 size={14} style={{ color: 'var(--red)' }} />
                 </button>

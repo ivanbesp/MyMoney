@@ -5,12 +5,12 @@ import { Transaction, Category, Period, Settings } from '@/lib/types';
 import { filterByPeriod, calcStats, formatMoney, txInBase } from '@/lib/storage';
 import { dayKey, monthKey } from '@/lib/dates';
 import { useChartColors } from '@/lib/theme';
+import { useT } from '@/lib/i18n';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import {
   format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear,
   eachDayOfInterval, eachMonthOfInterval,
 } from 'date-fns';
-import { ru } from 'date-fns/locale';
 
 interface Props {
   transactions: Transaction[];
@@ -30,6 +30,7 @@ const MAX_PIE_SLICES = 7;
 
 export default function Statistics({ transactions, categories, period, settings, theme }: Props) {
   // Recharts принимает только конкретные цвета — переменные приходится вычислять
+  const { t, dateLocale } = useT();
   const chart = useChartColors(theme);
   const filtered = useMemo(() => filterByPeriod(transactions, period), [transactions, period]);
   const { income, expense, balance } = useMemo(() => calcStats(filtered, settings), [filtered, settings]);
@@ -44,15 +45,15 @@ export default function Statistics({ transactions, categories, period, settings,
     const all = Array.from(map.entries())
       .map(([id, value]) => {
         const cat = categories.find(c => c.id === id);
-        return { name: cat?.name ?? 'Без категории', value, color: cat?.color ?? '#B8B8B8', icon: cat?.icon ?? '📦' };
+        return { name: cat?.name ?? t('list.noCategory'), value, color: cat?.color ?? '#B8B8B8', icon: cat?.icon ?? '📦' };
       })
       .sort((a, b) => b.value - a.value);
 
     if (all.length <= MAX_PIE_SLICES) return all;
     const head = all.slice(0, MAX_PIE_SLICES);
     const restValue = all.slice(MAX_PIE_SLICES).reduce((s, c) => s + c.value, 0);
-    return [...head, { name: 'Прочее', value: restValue, color: '#B8B8B8', icon: '📦' }];
-  }, [filtered, categories, settings]);
+    return [...head, { name: t('stats.other'), value: restValue, color: '#B8B8B8', icon: '📦' }];
+  }, [filtered, categories, settings, t]);
 
   // Динамика. Ключи считаются локальным format(), а не toISOString():
   // из-за UTC-конвертации столбцы уезжали на день назад в UTC+ зонах.
@@ -92,12 +93,12 @@ export default function Statistics({ transactions, categories, period, settings,
     return intervals.map(date => {
       const key = byMonth ? monthKey(date) : dayKey(date);
       return {
-        label: format(date, labelFmt, { locale: ru }),
+        label: format(date, labelFmt, { locale: dateLocale }),
         income: income.get(key) ?? 0,
         expense: expense.get(key) ?? 0,
       };
     });
-  }, [filtered, period, settings]);
+  }, [filtered, period, settings, dateLocale]);
 
   const pieTooltip = ({ active, payload }: TooltipProps) => {
     if (!active || !payload?.length) return null;
@@ -116,7 +117,7 @@ export default function Statistics({ transactions, categories, period, settings,
         <p className="font-medium mb-1">{label}</p>
         {payload.map(p => (
           <p key={p.name} style={{ color: p.fill }}>
-            {p.name === 'income' ? 'Доходы' : 'Расходы'}: {formatMoney(p.value ?? 0, settings.baseCurrency)}
+            {p.name === 'income' ? t('balance.income') : t('balance.expense')}: {formatMoney(p.value ?? 0, settings.baseCurrency)}
           </p>
         ))}
       </div>
@@ -127,9 +128,9 @@ export default function Statistics({ transactions, categories, period, settings,
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Доходы', value: income, color: 'var(--sage)', prefix: '' },
-          { label: 'Расходы', value: expense, color: 'var(--expense)', prefix: '' },
-          { label: 'Баланс', value: balance, color: balance >= 0 ? 'var(--sage)' : 'var(--red)', prefix: balance > 0 ? '+' : '' },
+          { label: t('balance.income'), value: income, color: 'var(--sage)', prefix: '' },
+          { label: t('balance.expense'), value: expense, color: 'var(--expense)', prefix: '' },
+          { label: t('stats.balance'), value: balance, color: balance >= 0 ? 'var(--sage)' : 'var(--red)', prefix: balance > 0 ? '+' : '' },
         ].map(item => (
           <div key={item.label} className="card p-4 text-center">
             <div className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{item.label}</div>
@@ -142,7 +143,7 @@ export default function Statistics({ transactions, categories, period, settings,
 
       {timelineData.length > 0 && (
         <div className="card p-5">
-          <h3 className="text-sm font-medium mb-4">Динамика</h3>
+          <h3 className="text-sm font-medium mb-4">{t('stats.dynamics')}</h3>
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={timelineData} barGap={2} barCategoryGap="30%">
               <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
@@ -162,11 +163,11 @@ export default function Statistics({ transactions, categories, period, settings,
           <div className="flex gap-4 mt-2">
             <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
               <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: chart.income }} />
-              Доходы
+              {t('balance.income')}
             </div>
             <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
               <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: chart.expense }} />
-              Расходы
+              {t('balance.expense')}
             </div>
           </div>
         </div>
@@ -174,7 +175,7 @@ export default function Statistics({ transactions, categories, period, settings,
 
       {expenseByCategory.length > 0 && (
         <div className="card p-5">
-          <h3 className="text-sm font-medium mb-4">Расходы по категориям</h3>
+          <h3 className="text-sm font-medium mb-4">{t('stats.byCategory')}</h3>
           <div className="flex gap-4 items-center">
             <div className="flex-shrink-0">
               <ResponsiveContainer width={140} height={140}>
@@ -216,7 +217,7 @@ export default function Statistics({ transactions, categories, period, settings,
       {filtered.length === 0 && (
         <div className="card p-8 text-center">
           <div className="text-3xl mb-2">📊</div>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Нет данных для отображения</p>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('stats.noData')}</p>
         </div>
       )}
     </div>

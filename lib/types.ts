@@ -10,12 +10,6 @@ export const CURRENCY_SYMBOLS: Record<Currency, string> = {
   EUR: '€',
 };
 
-export const CURRENCY_LABELS: Record<Currency, string> = {
-  RUB: 'Рубль ₽',
-  USD: 'Доллар $',
-  EUR: 'Евро €',
-};
-
 export interface CurrencyRates {
   // How many RUB per 1 unit of each currency
   USD: number; // e.g. 90 means 1 USD = 90 RUB
@@ -25,16 +19,19 @@ export interface CurrencyRates {
 /** 'system' следует за настройкой ОС, остальные фиксируют тему принудительно */
 export type ThemeMode = 'system' | 'light' | 'dark';
 export const THEME_MODES: ThemeMode[] = ['system', 'light', 'dark'];
-export const THEME_LABELS: Record<ThemeMode, string> = {
-  system: 'Как в системе',
-  light: 'Светлая',
-  dark: 'Тёмная',
-};
 
 export interface Settings {
   baseCurrency: Currency;   // the currency everything is displayed in
-  rates: CurrencyRates;     // manual exchange rates set by user
+  rates: CurrencyRates;     // exchange rates: RUB per 1 unit
   theme: ThemeMode;
+  /** Язык интерфейса. Названия категорий и счетов — данные пользователя, не переводятся. */
+  lang: 'ru' | 'en';
+  /** Тянуть курсы из сети. Выключено — курсы вводятся руками, как раньше. */
+  autoRates: boolean;
+  /** Когда курсы были получены из сети (ISO) */
+  ratesUpdatedAt?: string;
+  /** Название источника, показывается рядом с курсами */
+  ratesSource?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -44,6 +41,8 @@ export const DEFAULT_SETTINGS: Settings = {
     EUR: 98,
   },
   theme: 'system',
+  lang: 'ru',
+  autoRates: false,
 };
 
 export interface Category {
@@ -101,12 +100,6 @@ export interface PiggyBank {
 export type AccountKind = 'card' | 'cash' | 'savings' | 'other';
 
 export const ACCOUNT_KINDS: AccountKind[] = ['card', 'cash', 'savings', 'other'];
-export const ACCOUNT_KIND_LABELS: Record<AccountKind, string> = {
-  card: 'Карта',
-  cash: 'Наличные',
-  savings: 'Вклад',
-  other: 'Другое',
-};
 export const ACCOUNT_KIND_ICONS: Record<AccountKind, string> = {
   card: '💳',
   cash: '💵',

@@ -383,5 +383,61 @@ console.log('\n11. Счета и переводы');
     S.buildCSV({ ...m, accounts: [card, cash], transfers: [tr] }, settings).includes('Перевод'));
 }
 
+/* ─────────────────────────────────────────────
+   12. ЗАГРУЗКА КУРСОВ
+───────────────────────────────────────────── */
+console.log('\n12. Курсы из сети');
+{
+  const R = require('../.test-build/rates.js');
+  const [cbr, erapi, frank] = R.PROVIDERS_FOR_TEST;
+
+  // ЦБ РФ: курс даётся за Nominal единиц
+  const cbrOk = cbr.parse({
+    Date: '2026-08-12T11:30:00+03:00',
+    Valute: {
+      USD: { Nominal: 1, Value: 91.5, CharCode: 'USD' },
+      EUR: { Nominal: 1, Value: 99.2, CharCode: 'EUR' },
+    },
+  });
+  near('ЦБ: доллар', cbrOk.rates.USD, 91.5);
+  near('ЦБ: евро', cbrOk.rates.EUR, 99.2);
+  eq('ЦБ: дата курса', cbrOk.rateDate, '2026-08-12');
+
+  const cbrNominal = cbr.parse({
+    Valute: { USD: { Nominal: 10, Value: 915 }, EUR: { Nominal: 1, Value: 99 } },
+  });
+  near('ЦБ: Nominal 10 делится', cbrNominal.rates.USD, 91.5);
+
+  ok('ЦБ: без Valute — отказ', cbr.parse({}) === null);
+  ok('ЦБ: без рубля в ответе — отказ', cbr.parse({ Valute: { GBP: { Nominal: 1, Value: 120 } } }) === null);
+
+  // ExchangeRate-API отдаёт «валюты за 1 рубль» — нужен обратный курс
+  const erOk = erapi.parse({ rates: { USD: 1 / 91.5, EUR: 1 / 99.2 } });
+  near('er-api: доллар инвертирован', erOk.rates.USD, 91.5, 1e-6);
+  near('er-api: евро инвертировано', erOk.rates.EUR, 99.2, 1e-6);
+  ok('er-api: без rates — отказ', erapi.parse({}) === null);
+
+  // Frankfurter: рубля у ЕЦБ нет с 2022 года, ответ без него должен отбраковаться
+  ok('frankfurter: пустой ответ — отказ', frank.parse({ rates: {} }) === null);
+  near('frankfurter: рабочий ответ разбирается',
+    frank.parse({ rates: { USD: 1 / 91.5, EUR: 1 / 99.2 }, date: '2026-08-12' }).rates.USD, 91.5, 1e-6);
+
+  // Защита от перевёрнутого курса: 0.011 ₽ за доллар — явно ошибка
+  ok('перевёрнутый курс отбраковывается', cbr.parse({ Valute: { USD: { Nominal: 1, Value: 0.011 }, EUR: { Nominal: 1, Value: 0.01 } } }) === null);
+  ok('нулевой курс отбраковывается', cbr.parse({ Valute: { USD: { Nominal: 1, Value: 0 }, EUR: { Nominal: 1, Value: 99 } } }) === null);
+  ok('мусор вместо числа отбраковывается', cbr.parse({ Valute: { USD: { Nominal: 1, Value: 'сто' }, EUR: { Nominal: 1, Value: 99 } } }) === null);
+
+  // Возраст курсов
+  ok('без отметки времени — устарели', R.ratesAreStale(undefined) === true);
+  ok('только что — свежие', R.ratesAreStale(new Date().toISOString()) === false);
+  ok('сутки назад — устарели', R.ratesAreStale(new Date(Date.now() - 25 * 3600e3).toISOString()) === true);
+  ok('битая дата — устарели', R.ratesAreStale('не дата') === true);
+
+  eq('подпись без отметки', R.formatAgo(undefined), 'ещё не обновлялись');
+  eq('подпись «только что»', R.formatAgo(new Date().toISOString()), 'только что');
+  eq('подпись в часах', R.formatAgo(new Date(Date.now() - 3 * 3600e3).toISOString()), '3 ч. назад');
+  eq('подпись «вчера»', R.formatAgo(new Date(Date.now() - 26 * 3600e3).toISOString()), 'вчера');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -7,8 +7,8 @@ import {
 } from '@/lib/types';
 import { filterByPeriod, formatMoney, txInBase, sortTransactions } from '@/lib/storage';
 import { parseDay, periodRange } from '@/lib/dates';
+import { useT } from '@/lib/i18n';
 import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
 import {
   Trash2, Pencil, ChevronDown, Search, X, SlidersHorizontal, RotateCcw,
   ArrowLeftRight, ArrowRight,
@@ -37,6 +37,7 @@ export default function TransactionList({
   transactions, categories, accounts, transfers = [], period, settings,
   onDelete, onUpdate, onRepeat, searchable = false,
 }: Props) {
+  const { t, dateLocale } = useT();
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [limit, setLimit] = useState(PAGE);
   const [query, setQuery] = useState('');
@@ -86,15 +87,16 @@ export default function TransactionList({
     let list = range ? transfers.filter(t => t.date >= range.from && t.date <= range.to) : transfers;
     const q = query.trim().toLowerCase();
     if (q) {
-      list = list.filter(t => {
-        const from = accById.get(t.fromAccountId)?.name ?? '';
-        const to = accById.get(t.toAccountId)?.name ?? '';
-        return [t.note, from, to, String(t.amountFrom), t.date, 'перевод']
+      // переменная цикла названа tr, чтобы не затенять функцию перевода t
+      list = list.filter(tr => {
+        const from = accById.get(tr.fromAccountId)?.name ?? '';
+        const to = accById.get(tr.toAccountId)?.name ?? '';
+        return [tr.note, from, to, String(tr.amountFrom), tr.date, t('list.transfer').toLowerCase()]
           .filter(Boolean).join(' ').toLowerCase().includes(q);
       });
     }
     return list;
-  }, [transfers, period, query, typeFilter, categoryFilter, accById]);
+  }, [transfers, period, query, typeFilter, categoryFilter, accById, t]);
 
   const grouped = useMemo(() => {
     const page = filtered.slice(0, limit);
@@ -123,7 +125,7 @@ export default function TransactionList({
 
   const formatDay = (dayKey: string) => {
     try {
-      return format(parseDay(dayKey), 'd MMMM, EEEE', { locale: ru });
+      return format(parseDay(dayKey), 'd MMMM, EEEE', { locale: dateLocale });
     } catch {
       return dayKey;
     }
@@ -144,15 +146,15 @@ export default function TransactionList({
           <input
             className="input pl-10 pr-10"
             type="search"
-            placeholder="Поиск по записям"
+            placeholder={t('list.search')}
             value={query}
             onChange={e => setQuery(e.target.value)}
-            aria-label="Поиск по записям"
+            aria-label={t('list.search')}
           />
           {query && (
             <button
               onClick={() => setQuery('')}
-              aria-label="Очистить поиск"
+              aria-label={t('list.clearSearch')}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg"
               style={{ color: 'var(--text-muted)' }}
             >
@@ -162,7 +164,7 @@ export default function TransactionList({
         </div>
         <button
           onClick={() => setShowFilters(v => !v)}
-          aria-label="Фильтры"
+          aria-label={t('list.filters')}
           aria-expanded={showFilters}
           className="px-3 rounded-lg flex-shrink-0 transition-colors"
           style={{
@@ -178,9 +180,9 @@ export default function TransactionList({
       {showFilters && (
         <div className="card p-3 space-y-3 animate-fade-in">
           <div>
-            <div className="text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Тип</div>
+            <div className="text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('list.filterType')}</div>
             <div className="flex gap-1.5">
-              {([['all', 'Все'], ['expense', 'Расходы'], ['income', 'Доходы']] as const).map(([v, label]) => (
+              {([['all', t('common.all')], ['expense', t('type.expensePlain')], ['income', t('type.incomePlain')]] as const).map(([v, label]) => (
                 <button
                   key={v}
                   onClick={() => setTypeFilter(v as TypeFilter)}
@@ -193,14 +195,14 @@ export default function TransactionList({
             </div>
           </div>
           <div>
-            <div className="text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>Категория</div>
+            <div className="text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('list.filterCategory')}</div>
             <select
               className="input"
               value={categoryFilter}
               onChange={e => setCategoryFilter(e.target.value)}
-              aria-label="Фильтр по категории"
+              aria-label={t('list.filterCategory')}
             >
-              <option value="all">Все категории</option>
+              <option value="all">{t('list.allCategories')}</option>
               {usedCategories.map(c => (
                 <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
               ))}
@@ -211,7 +213,7 @@ export default function TransactionList({
               className="btn-ghost w-full"
               onClick={() => { setTypeFilter('all'); setCategoryFilter('all'); }}
             >
-              Сбросить фильтры
+              {t('list.resetFilters')}
             </button>
           )}
         </div>
@@ -219,9 +221,9 @@ export default function TransactionList({
 
       {(query || hasFilters) && (
         <div className="flex justify-between text-xs px-1" style={{ color: 'var(--text-muted)' }}>
-          <span>Найдено: {filtered.length}</span>
+          <span>{t('list.found', { n: filtered.length })}</span>
           <span className="num">
-            Итого {total >= 0 ? '+' : '−'}{formatMoney(Math.abs(total), settings.baseCurrency)}
+            {t('list.total', { sum: `${total >= 0 ? '+' : '−'}${formatMoney(Math.abs(total), settings.baseCurrency)}` })}
           </span>
         </div>
       )}
@@ -235,7 +237,7 @@ export default function TransactionList({
         <div className="card p-8 text-center">
           <div className="text-3xl mb-2">📭</div>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            {query || hasFilters ? 'Ничего не нашлось — попробуйте изменить запрос' : 'Нет записей за выбранный период'}
+            {query || hasFilters ? t('list.emptySearch') : t('list.empty')}
           </p>
         </div>
       </>
@@ -299,7 +301,7 @@ export default function TransactionList({
 
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">
-                        {sub ? sub.name : (cat?.name ?? 'Без категории')}
+                        {sub ? sub.name : (cat?.name ?? t('list.noCategory'))}
                       </div>
                       <div className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
                         {[
@@ -333,8 +335,8 @@ export default function TransactionList({
                         <button
                           onClick={() => onRepeat(tx)}
                           className="p-2 rounded-lg hover:bg-[var(--bg-card2)] transition-colors"
-                          aria-label="Повторить сегодня"
-                          title="Повторить сегодня"
+                          aria-label={t('list.repeat')}
+                          title={t('list.repeat')}
                         >
                           <RotateCcw size={14} style={{ color: 'var(--text-muted)' }} />
                         </button>
@@ -342,16 +344,16 @@ export default function TransactionList({
                       <button
                         onClick={() => setEditing(tx)}
                         className="p-2 rounded-lg hover:bg-[var(--bg-card2)] transition-colors"
-                        aria-label="Редактировать запись"
-                        title="Редактировать"
+                        aria-label={t('list.editRecord')}
+                        title={t('list.editRecord')}
                       >
                         <Pencil size={14} style={{ color: 'var(--text-muted)' }} />
                       </button>
                       <button
                         onClick={() => onDelete(tx)}
                         className="p-2 rounded-lg hover:bg-[var(--red-light)] transition-colors"
-                        aria-label="Удалить запись"
-                        title="Удалить"
+                        aria-label={t('list.deleteRecord')}
+                        title={t('list.deleteRecord')}
                       >
                         <Trash2 size={14} style={{ color: 'var(--red)' }} />
                       </button>
@@ -382,7 +384,7 @@ export default function TransactionList({
                         {to?.name ?? '—'}
                       </div>
                       <div className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
-                        {['Перевод', tr.note].filter(Boolean).join(' · ')}
+                        {[t('list.transfer'), tr.note].filter(Boolean).join(' · ')}
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
@@ -408,7 +410,7 @@ export default function TransactionList({
             className="btn-ghost w-full flex items-center justify-center gap-1"
           >
             <ChevronDown size={16} />
-            Показать ещё ({filtered.length - limit})
+            {t('list.showMore', { n: filtered.length - limit })}
           </button>
         )}
       </div>
