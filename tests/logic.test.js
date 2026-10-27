@@ -350,7 +350,7 @@ console.log('\n11. Счета и переводы');
     categories: [], piggyBanks: [], budgets: [],
   };
   const m = S.migrate(legacy, RATES, 'EUR');
-  eq('версия 5', m.version, 5);
+  eq('версия схемы актуальная', m.version, S.SCHEMA_VERSION);
   eq('создан один счёт', m.accounts.length, 1);
   eq('и это «Основной»', m.accounts[0].id, D3.DEFAULT_ACCOUNT_ID);
   eq('в валюте отображения', m.accounts[0].currency, 'EUR');
@@ -437,6 +437,102 @@ console.log('\n12. Курсы из сети');
   eq('подпись «только что»', R.formatAgo(new Date().toISOString()), 'только что');
   eq('подпись в часах', R.formatAgo(new Date(Date.now() - 3 * 3600e3).toISOString()), '3 ч. назад');
   eq('подпись «вчера»', R.formatAgo(new Date(Date.now() - 26 * 3600e3).toISOString()), 'вчера');
+}
+
+/* Планы бюджета по месяцам */
+console.log('\nПланы бюджета');
+{
+  const P = require('../.test-build/plans.js');
+  const settings = { baseCurrency: 'RUB', rates: RATES };
+  const cats = [
+    { id: 'food', type: 'expense', name: 'Еда', color: '', icon: '', subcategories: [] },
+    { id: 'taxi', type: 'expense', name: 'Такси', color: '', icon: '', subcategories: [] },
+    { id: 'gift', type: 'expense', name: 'Подарки', color: '', icon: '', subcategories: [] },
+    { id: 'cat-savings-out', type: 'expense', name: 'В копилку', color: '', icon: '', subcategories: [] },
+    { id: 'salary', type: 'income', name: 'Зарплата', color: '', icon: '', subcategories: [] },
+  ];
+  const budgets = [
+    { id: 'b-food', categoryId: 'food', amount: 30000, currency: 'RUB', createdAt: '' },
+    { id: 'b-taxi', categoryId: 'taxi', amount: 100, currency: 'USD', createdAt: '' },
+  ];
+
+  eq('сдвиг месяца вперёд через год', P.shiftMonth('2026-11', 3), '2027-02');
+  eq('сдвиг месяца назад через год', P.shiftMonth('2026-01', -1), '2025-12');
+  eq('копилка не планируется как категория', P.plannableCategories(cats).map(c => c.id), ['food', 'taxi', 'gift']);
+
+  // Без плана — лимиты из обычных бюджетов, доллары по текущему курсу
+  eq('лимит без плана — из бюджета', P.planLimit(undefined, budgets, 'food', settings), { value: 30000, source: 'budget' });
+  eq('лимит в валюте — по курсу', P.planLimit(undefined, budgets, 'taxi', settings), { value: 9000, source: 'budget' });
+  eq('категория без лимита', P.planLimit(undefined, budgets, 'gift', settings), { value: 0, source: 'none' });
+
+  const plan = {
+    month: '2026-12', currency: 'RUB', limits: { food: 35000, gift: 25000 },
+    income: 230000, savings: 30000, oneOffs: [{ id: 'o', name: 'Страховка', amount: 9800 }], updatedAt: '',
+  };
+  eq('план переопределяет лимит', P.planLimit(plan, budgets, 'food', settings), { value: 35000, source: 'plan' });
+  eq('непереопределённое — из бюджета', P.planLimit(plan, budgets, 'taxi', settings).source, 'budget');
+  eq('ноль в плане — тоже значение', P.planLimit({ ...plan, limits: { food: 0 } }, budgets, 'food', settings), { value: 0, source: 'plan' });
+
+  const tot = P.planTotals(plan, budgets, cats, settings, 185000);
+  eq('сумма лимитов: 35 000 + 9 000 + 25 000', tot.limits, 69000);
+  eq('разовые траты', tot.oneOffs, 9800);
+  eq('доход из плана, не из среднего', [tot.income, tot.incomeEstimated], [230000, false]);
+  eq('свободно = доход − расходы − копилки', tot.free, 230000 - 69000 - 9800 - 30000);
+  eq('запас большой — ok', tot.status, 'ok');
+
+  const noIncome = P.planTotals({ ...plan, income: undefined }, budgets, cats, settings, 100000);
+  eq('без дохода в плане — берём среднее', [noIncome.income, noIncome.incomeEstimated], [100000, true]);
+  eq('расходы больше дохода — дефицит', noIncome.status, 'deficit');
+  eq('впритык — меньше 10% дохода', P.planTotals({ ...plan, income: 115000 }, budgets, cats, settings, 0).status, 'tight');
+  eq('нет плана — статус empty', P.planTotals(undefined, budgets, cats, settings, 0).status, 'empty');
+
+  // План в долларах при базовой валюте в рублях
+  const usdPlan = { ...plan, currency: 'USD', limits: { food: 400 }, income: 2000, savings: undefined, oneOffs: [] };
+  near('план в $ пересчитан в ₽', P.planTotals(usdPlan, budgets, cats, settings, 0).income, 180000);
+
+  // Действующие лимиты месяца
+  const eff = P.effectiveBudgets(budgets, [plan], '2026-12');
+  eq('лимит еды взят из плана', eff.find(b => b.categoryId === 'food').amount, 35000);
+  eq('id настоящего бюджета сохранён', eff.find(b => b.categoryId === 'food').id, 'b-food');
+  eq('такси без изменений', eff.find(b => b.categoryId === 'taxi').amount, 100);
+  eq('категория только из плана — виртуальный лимит', eff.find(b => b.categoryId === 'gift').id, 'plan:gift');
+  eq('в другом месяце план не действует', P.effectiveBudgets(budgets, [plan], '2026-11'), budgets);
+
+  // История: среднее только по месяцам, где были записи
+  const mk = (id, date, type, cat, amount) => ({ id, date, type, amount, currency: 'RUB', rate: 1, categoryId: cat, accountId: 'a', createdAt: '' });
+  const txs = [
+    mk('1', '2026-09-03', 'expense', 'food', 30000),
+    mk('2', '2026-09-05', 'income', 'salary', 180000),
+    mk('3', '2026-10-03', 'expense', 'food', 34000),
+    mk('4', '2026-10-05', 'income', 'salary', 190000),
+    mk('5', '2026-11-02', 'expense', 'food', 99999), // текущий месяц в среднее не входит
+  ];
+  const h = P.averageHistory(txs, '2026-11', 3, settings);
+  eq('пустой август в среднее не идёт', h.months, 2);
+  eq('средние расходы на еду', h.spend.get('food'), 32000);
+  eq('средний доход', h.income, 185000);
+  eq('факт за месяц', P.spendByCategory(txs, '2026-10', settings).get('food'), 34000);
+  eq('округление до сотни', P.roundPlan(31649), 31600);
+
+  // Миграция и копия
+  const m = S.migrate({ version: 5, transactions: [], categories: [], piggyBanks: [], budgets: [], accounts: [], transfers: [] }, RATES);
+  eq('у старых данных планов нет', m.plans, []);
+  const dirty = S.migrate({
+    version: 6, transactions: [], plans: [
+      plan,
+      { ...plan, limits: { food: 1 } },                      // дубль месяца
+      { month: '2026-13', currency: 'RUB', limits: {} },     // кривой месяц
+      { month: '2027-01', limits: { food: -5, gift: 'x', taxi: '700' }, oneOffs: [{ name: 'Пусто', amount: 0 }] },
+    ],
+  }, RATES);
+  eq('кривые и дубли отброшены', dirty.plans.map(p => p.month), ['2026-12', '2027-01']);
+  eq('берётся первый план месяца', dirty.plans[0].limits.food, 35000);
+  eq('отрицательные и нечисловые лимиты отброшены', dirty.plans[1].limits, { taxi: 700 });
+  eq('пустые разовые траты отброшены', dirty.plans[1].oneOffs, []);
+  eq('валюта по умолчанию', dirty.plans[1].currency, 'RUB');
+  const backup = S.buildBackup({ ...m, plans: [plan] }, settings);
+  eq('план попадает в копию и восстанавливается',
+    S.parseBackup(JSON.stringify(backup), RATES).data.plans[0].limits, plan.limits);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -289,33 +289,37 @@ export function AccountsStrip({ accounts, transactions, transfers, settings, onO
   if (accounts.length === 0) return null;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-sm font-medium">{t('nav.accounts')}</h2>
-        <button onClick={onOpen} className="text-xs" style={{ color: 'var(--sage)' }}>{t('common.seeAll')}</button>
+    <section className="card px-5 py-[18px]">
+      <div className="flex items-center justify-between">
+        <h2 className="text-[15px] font-bold">{t('nav.accounts')}</h2>
+        <button onClick={onOpen} className="text-[13px] font-bold" style={{ color: 'var(--sage)' }}>{t('common.seeAll')}</button>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-        {accounts.map(a => {
+      <div className="flex flex-col mt-2">
+        {accounts.map((a, i) => {
           const balance = accountBalance(a, transactions, transfers, settings.rates);
           return (
             <button
               key={a.id}
               onClick={onOpen}
-              className="card p-3 flex-shrink-0 text-left"
-              style={{ minWidth: 150, borderLeft: `3px solid ${a.color}` }}
+              className="flex items-center gap-3 py-2.5 text-left"
+              style={{ borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}
             >
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-sm">{ACCOUNT_KIND_ICONS[a.kind]}</span>
-                <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{a.name}</span>
-              </div>
-              <div className="num font-medium" style={{ color: balance < 0 ? 'var(--red)' : 'var(--text)' }}>
+              <span
+                className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[15px] flex-shrink-0"
+                style={{ background: a.color + '26' }}
+                aria-hidden="true"
+              >
+                {ACCOUNT_KIND_ICONS[a.kind]}
+              </span>
+              <span className="flex-1 min-w-0 text-sm font-semibold truncate">{a.name}</span>
+              <span className="num text-sm font-bold" style={{ color: balance < 0 ? 'var(--red)' : 'var(--text)' }}>
                 {formatMoney(balance, a.currency)}
-              </div>
+              </span>
             </button>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }
 

@@ -17,6 +17,8 @@ interface Props {
   onAdd: (b: Budget) => void;
   onUpdate: (b: Budget) => void;
   onDelete: (id: string) => void;
+  /** Категории, у которых лимит этого месяца пришёл из плана */
+  plannedCategoryIds?: Set<string>;
 }
 
 function BudgetForm({ initial, categories, budgets, settings, onSave, onClose }: {
@@ -149,12 +151,14 @@ function BudgetForm({ initial, categories, budgets, settings, onSave, onClose }:
   );
 }
 
-export function BudgetRow({ budget, category, transactions, settings, compact }: {
+export function BudgetRow({ budget, category, transactions, settings, compact, planned }: {
   budget: Budget;
   category?: Category;
   transactions: Transaction[];
   settings: Settings;
   compact?: boolean;
+  /** Лимит этого месяца задан планом, а не обычным бюджетом */
+  planned?: boolean;
 }) {
   const { t } = useT();
   const p = budgetProgress(budget, transactions, settings);
@@ -176,7 +180,15 @@ export function BudgetRow({ budget, category, transactions, settings, compact }:
             {category?.icon ?? '📦'}
           </span>
         )}
-        <span className="text-sm font-medium flex-1 truncate">{category?.name ?? t('list.noCategory')}</span>
+        <span className="text-sm font-semibold flex-1 truncate">
+          {category?.name ?? t('list.noCategory')}
+          {planned && (
+            <span className="ml-2 text-[11px] font-bold px-1.5 py-0.5 rounded-md align-middle"
+              style={{ background: 'var(--tone-info-bg)', color: 'var(--tone-info-fg)' }}>
+              {t('budgets.fromPlan')}
+            </span>
+          )}
+        </span>
         <span className="text-xs num flex-shrink-0" style={{ color }}>
           {p.state === 'over'
             ? t('budgets.over', { value: formatMoney(-p.remaining, settings.baseCurrency) })
@@ -207,48 +219,55 @@ export function BudgetRow({ budget, category, transactions, settings, compact }:
   );
 }
 
-/** Три самых горящих лимита — блок для обзора */
-export function BudgetSummary({ budgets, categories, transactions, settings, onOpen }: {
+/** Самые горящие лимиты — блок для обзора */
+export function BudgetSummary({ budgets, categories, transactions, settings, onOpen, onOpenPlan, planLabel }: {
   budgets: Budget[];
   categories: Category[];
   transactions: Transaction[];
   settings: Settings;
   onOpen: () => void;
+  onOpenPlan: () => void;
+  /** «План на ноябрь →» */
+  planLabel: string;
 }) {
   const { t } = useT();
   const top = useMemo(() => {
     return [...budgets]
       .map(b => ({ b, p: budgetProgress(b, transactions, settings) }))
       .sort((a, x) => x.p.ratio - a.p.ratio)
-      .slice(0, 3);
+      .slice(0, 4);
   }, [budgets, transactions, settings]);
 
-  if (top.length === 0) return null;
-
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-sm font-medium">{t('nav.budgets')}</h2>
-        <button onClick={onOpen} className="text-xs" style={{ color: 'var(--sage)' }}>{t('common.seeAll')}</button>
+    <section className="card px-5 py-[18px]">
+      <div className="flex items-center justify-between gap-2">
+        <button onClick={onOpen} className="text-[15px] font-bold hover:underline">{t('nav.budgets')}</button>
+        <button onClick={onOpenPlan} className="text-[13px] font-bold" style={{ color: 'var(--sage)' }}>{planLabel}</button>
       </div>
-      <div className="card px-4">
-        {top.map(({ b }, i) => (
-          <div key={b.id} style={{ borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
-            <BudgetRow
-              budget={b}
-              category={categories.find(c => c.id === b.categoryId)}
-              transactions={transactions}
-              settings={settings}
-              compact
-            />
-          </div>
-        ))}
-      </div>
-    </div>
+      {top.length === 0 ? (
+        <p className="text-sm mt-3" style={{ color: 'var(--text-muted)' }}>{t('budgets.emptyHint')}</p>
+      ) : (
+        <div className="mt-1">
+          {top.map(({ b }, i) => (
+            <div key={b.id} style={{ borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
+              <BudgetRow
+                budget={b}
+                category={categories.find(c => c.id === b.categoryId)}
+                transactions={transactions}
+                settings={settings}
+                compact
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
-export default function Budgets({ budgets, categories, transactions, settings, onAdd, onUpdate, onDelete }: Props) {
+export default function Budgets({
+  budgets, categories, transactions, settings, onAdd, onUpdate, onDelete, plannedCategoryIds,
+}: Props) {
   const { t } = useT();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Budget | null>(null);
@@ -288,35 +307,36 @@ export default function Budgets({ budgets, categories, transactions, settings, o
         />
       )}
 
-      {budgets.length > 0 && (
-        <div className="card p-4">
-          <div className="flex justify-between items-baseline mb-2">
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('budgets.allMonth')}</span>
-            <span className="text-xs num" style={{ color: 'var(--text-muted)' }}>
-              {Math.round(totals.ratio * 100)}%
-            </span>
+      <div className="flex flex-wrap items-stretch gap-4">
+        {budgets.length > 0 && (
+          <div className="card p-5 flex-[1_1_360px]">
+            <div className="flex justify-between items-baseline mb-2">
+              <span className="text-[13px] font-semibold" style={{ color: 'var(--text-muted)' }}>{t('budgets.allMonth')}</span>
+              <span className="text-[13px] num font-semibold" style={{ color: 'var(--text-muted)' }}>
+                {Math.round(totals.ratio * 100)}%
+              </span>
+            </div>
+            <div className="num-hero text-2xl mb-3">
+              {t('budgets.spentOf', {
+                spent: formatMoney(totals.spent, settings.baseCurrency),
+                limit: formatMoney(totals.limit, settings.baseCurrency),
+              })}
+            </div>
+            <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-card2)' }}>
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min(totals.ratio, 1) * 100}%`,
+                  background: totals.ratio >= 1 ? 'var(--red)' : totals.ratio >= 0.8 ? 'var(--expense)' : 'var(--sage)',
+                }}
+              />
+            </div>
           </div>
-          <div className="num-hero text-2xl mb-2">
-            {t('budgets.spentOf', {
-              spent: formatMoney(totals.spent, settings.baseCurrency),
-              limit: formatMoney(totals.limit, settings.baseCurrency),
-            })}
-          </div>
-          <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-card2)' }}>
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${Math.min(totals.ratio, 1) * 100}%`,
-                background: totals.ratio >= 1 ? 'var(--red)' : totals.ratio >= 0.8 ? 'var(--expense)' : 'var(--sage)',
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      <button onClick={() => setShowForm(true)} className="btn-primary w-full flex items-center justify-center gap-2">
-        <Plus size={16} /> {t('budgets.new')}
-      </button>
+        )}
+        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center justify-center gap-2 self-start h-[42px] py-0">
+          <Plus size={16} /> {t('budgets.new')}
+        </button>
+      </div>
 
       {budgets.length === 0 && (
         <div className="card p-8 text-center">
@@ -328,7 +348,7 @@ export default function Budgets({ budgets, categories, transactions, settings, o
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="grid gap-3 lg:grid-cols-2">
         {sorted.map(({ b }) => (
           <div key={b.id} className="card row-hover">
             <div className="flex items-start">
@@ -338,6 +358,7 @@ export default function Budgets({ budgets, categories, transactions, settings, o
                   category={catById.get(b.categoryId)}
                   transactions={transactions}
                   settings={settings}
+                  planned={plannedCategoryIds?.has(b.categoryId)}
                 />
               </div>
               <div className="row-actions flex gap-0.5 p-2 flex-shrink-0">

@@ -67,6 +67,7 @@ export function useChartColors(resolvedTheme: 'light' | 'dark') {
     expense: '#C2703F',
     grid: '#E2E4E8',
     muted: '#7C828C',
+    bar: '#A8C5B2',
   });
 
   useEffect(() => {
@@ -78,6 +79,7 @@ export function useChartColors(resolvedTheme: 'light' | 'dark') {
       expense: read('--expense', '#C2703F'),
       grid: read('--grid', '#E2E4E8'),
       muted: read('--text-muted', '#7C828C'),
+      bar: read('--chart-bar', '#A8C5B2'),
     });
   }, [resolvedTheme]);
 

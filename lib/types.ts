@@ -154,6 +154,39 @@ export interface Budget {
 /** Порог, после которого лимит подсвечивается как «на исходе» */
 export const BUDGET_WARN_THRESHOLD = 0.8;
 
+/** Разовая плановая трата: подарки к праздникам, страховка, отпуск */
+export interface PlannedOneOff {
+  id: string;
+  name: string;
+  /** В валюте плана */
+  amount: number;
+}
+
+/**
+ * План на конкретный месяц.
+ *
+ * Хранит только то, что пользователь задал руками: лимит категории, которого
+ * нет в `limits`, берётся из обычного бюджета. Поэтому план можно не заполнять
+ * целиком — достаточно поправить пару категорий, остальное подтянется.
+ *
+ * Когда месяц наступает, план ничего никуда не копирует: текущие бюджеты
+ * просто читают лимиты из плана этого месяца (см. effectiveBudgets).
+ */
+export interface BudgetPlan {
+  /** 'YYYY-MM' */
+  month: string;
+  /** Валюта, в которой введены суммы плана */
+  currency: Currency;
+  /** categoryId → лимит на месяц */
+  limits: Record<string, number>;
+  /** Ожидаемый доход. Не задан — берём средний за последние месяцы. */
+  income?: number;
+  /** Сколько планируется отложить в копилки */
+  savings?: number;
+  oneOffs: PlannedOneOff[];
+  updatedAt: string;
+}
+
 export interface AppData {
   /** Версия схемы хранилища. Отсутствует у данных, записанных до миграций. */
   version?: number;
@@ -163,6 +196,8 @@ export interface AppData {
   budgets: Budget[];
   accounts: Account[];
   transfers: Transfer[];
+  /** Планы бюджета на будущие (и текущий) месяцы */
+  plans: BudgetPlan[];
 }
 
 /** Формат файла резервной копии */

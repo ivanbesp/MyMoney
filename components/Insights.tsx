@@ -99,18 +99,18 @@ export default function Insights({ transactions, categories, settings }: Props) 
   }, [transactions, categories, settings, t]);
 
   return (
-    <div>
-      <div className="flex items-center gap-1.5 mb-2">
-        <Lightbulb size={13} style={{ color: 'var(--text-muted)' }} />
-        <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('insights.title')}</span>
-      </div>
+    <section className="card pt-[18px] pb-1.5">
+      <h2 className="flex items-center gap-2 px-5 text-[15px] font-bold">
+        <Lightbulb size={15} style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
+        {t('insights.title')}
+      </h2>
       {/* Раньше каждый инсайт сидел в своей пастельной рамке — три цветных
           прямоугольника подряд спорили с палитрой. Хватает цветной иконки. */}
-      <div className="card">
+      <div className="mt-1.5">
         {insights.map((ins, i) => (
           <div
             key={i}
-            className="flex items-start gap-2.5 px-4 py-3 text-sm"
+            className="flex items-start gap-2.5 px-5 py-3 text-sm"
             style={{ borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}
           >
             <span
@@ -124,6 +124,6 @@ export default function Insights({ transactions, categories, settings }: Props) 
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

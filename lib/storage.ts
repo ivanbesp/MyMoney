@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  AppData, BackupFile, Transaction, Category, PiggyBank, Budget, Account, Transfer, Period,
+  AppData, BackupFile, Transaction, Category, PiggyBank, Budget, Account, Transfer, Period, BudgetPlan,
   Settings, DEFAULT_SETTINGS, Currency, CURRENCY_SYMBOLS, CurrencyRates,
   ThemeMode, THEME_MODES, BUDGET_WARN_THRESHOLD, AccountKind,
 } from './types';
@@ -18,7 +18,7 @@ const SETTINGS_KEY = 'finance_tracker_settings';
 /** Снимок данных в том виде, в каком они были до первой миграции. Страховка. */
 const PRE_MIGRATION_KEY = 'finance_tracker_backup_pre_v2';
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 const defaultData: AppData = {
   version: SCHEMA_VERSION,
@@ -28,6 +28,7 @@ const defaultData: AppData = {
   budgets: [],
   accounts: [makeDefaultAccount(DEFAULT_SETTINGS.baseCurrency)],
   transfers: [],
+  plans: [],
 };
 
 // ─── Курсы ────────────────────────────────────────────────────────────────────
@@ -254,7 +255,36 @@ export function migrate(
       createdAt: b.createdAt ?? new Date().toISOString(),
     }));
 
-  return { version: SCHEMA_VERSION, transactions, categories, piggyBanks, budgets, accounts, transfers };
+  // v5 → v6: появились планы по месяцам. Один план на месяц, мусор отбрасываем.
+  const plans: BudgetPlan[] = [];
+  const seenMonths = new Set<string>();
+  for (const p of Array.isArray(raw.plans) ? raw.plans : []) {
+    if (!p || typeof p.month !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(p.month)) continue;
+    if (seenMonths.has(p.month)) continue;
+    seenMonths.add(p.month);
+    const limits: Record<string, number> = {};
+    for (const [cat, value] of Object.entries(p.limits ?? {})) {
+      const n = Number(value);
+      if (Number.isFinite(n) && n >= 0) limits[cat] = n;
+    }
+    const optional = (v: unknown) => {
+      const n = Number(v);
+      return v !== undefined && v !== null && Number.isFinite(n) && n >= 0 ? n : undefined;
+    };
+    plans.push({
+      month: p.month,
+      currency: (p.currency ?? 'RUB') as Currency,
+      limits,
+      income: optional(p.income),
+      savings: optional(p.savings),
+      oneOffs: (Array.isArray(p.oneOffs) ? p.oneOffs : [])
+        .filter(o => o && Number(o.amount) > 0)
+        .map(o => ({ id: o.id ?? uid(), name: String(o.name ?? ''), amount: Number(o.amount) })),
+      updatedAt: p.updatedAt ?? new Date().toISOString(),
+    });
+  }
+
+  return { version: SCHEMA_VERSION, transactions, categories, piggyBanks, budgets, accounts, transfers, plans };
 }
 
 /** Порядок для показа: свежая дата сверху, при равной — позже созданная */
@@ -413,9 +443,23 @@ export function useFinanceData(
   const deleteBudget = useCallback((id: string) =>
     setData(prev => ({ ...prev, budgets: prev.budgets.filter(b => b.id !== id) })), []);
 
+  /** Создаёт или заменяет план месяца. Пустой план удаляется — он ничего не меняет. */
+  const savePlan = useCallback((plan: BudgetPlan) =>
+    setData(prev => {
+      const others = prev.plans.filter(p => p.month !== plan.month);
+      const empty = Object.keys(plan.limits).length === 0 && plan.income === undefined
+        && plan.savings === undefined && plan.oneOffs.length === 0;
+      const plans = empty ? others : [...others, { ...plan, updatedAt: new Date().toISOString() }];
+      return { ...prev, plans: plans.sort((a, b) => a.month.localeCompare(b.month)) };
+    }), []);
+
+  const deletePlan = useCallback((month: string) =>
+    setData(prev => ({ ...prev, plans: prev.plans.filter(p => p.month !== month) })), []);
+
   /** Полная замена состояния — используется при восстановлении из копии */
   const replaceAll = useCallback((next: AppData) => setData({
     ...next,
+    plans: next.plans ?? [],
     version: SCHEMA_VERSION,
     transactions: sortTransactions(next.transactions),
   }), []);
@@ -428,6 +472,7 @@ export function useFinanceData(
     addBudget, updateBudget, deleteBudget,
     addAccount, updateAccount, deleteAccount,
     addTransfer, deleteTransfer,
+    savePlan, deletePlan,
     replaceAll,
   };
 }
@@ -525,6 +570,7 @@ export function buildBackup(data: AppData, settings: Settings): BackupFile {
     budgets: data.budgets,
     accounts: data.accounts,
     transfers: data.transfers,
+    plans: data.plans,
   };
 }
 

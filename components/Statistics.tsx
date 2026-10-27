@@ -132,19 +132,20 @@ export default function Statistics({ transactions, categories, period, settings,
           { label: t('balance.expense'), value: expense, color: 'var(--expense)', prefix: '' },
           { label: t('stats.balance'), value: balance, color: balance >= 0 ? 'var(--sage)' : 'var(--red)', prefix: balance > 0 ? '+' : '' },
         ].map(item => (
-          <div key={item.label} className="card p-4 text-center">
-            <div className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{item.label}</div>
-            <div className="num text-base font-medium" style={{ color: item.color }}>
+          <div key={item.label} className="card px-5 py-[18px] min-w-0">
+            <div className="text-[13px] font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>{item.label}</div>
+            <div className="num-hero text-xl md:text-[26px] truncate" style={{ color: item.color }}>
               {item.prefix}{formatMoney(item.value, settings.baseCurrency)}
             </div>
           </div>
         ))}
       </div>
 
+      <div className="grid gap-4 xl:grid-cols-2 items-start">
       {timelineData.length > 0 && (
-        <div className="card p-5">
-          <h3 className="text-sm font-medium mb-4">{t('stats.dynamics')}</h3>
-          <ResponsiveContainer width="100%" height={160}>
+        <div className="card p-5 min-w-0">
+          <h3 className="text-[15px] font-bold mb-4">{t('stats.dynamics')}</h3>
+          <ResponsiveContainer width="100%" height={240}>
             <BarChart data={timelineData} barGap={2} barCategoryGap="30%">
               <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: chart.muted }} axisLine={false} tickLine={false} />
@@ -174,13 +175,13 @@ export default function Statistics({ transactions, categories, period, settings,
       )}
 
       {expenseByCategory.length > 0 && (
-        <div className="card p-5">
-          <h3 className="text-sm font-medium mb-4">{t('stats.byCategory')}</h3>
-          <div className="flex gap-4 items-center">
+        <div className="card p-5 min-w-0">
+          <h3 className="text-[15px] font-bold mb-4">{t('stats.byCategory')}</h3>
+          <div className="flex gap-6 items-center">
             <div className="flex-shrink-0">
-              <ResponsiveContainer width={140} height={140}>
+              <ResponsiveContainer width={200} height={200}>
                 <PieChart>
-                  <Pie data={expenseByCategory} cx={70} cy={70} innerRadius={38} outerRadius={65} paddingAngle={2} dataKey="value">
+                  <Pie data={expenseByCategory} cx={100} cy={100} innerRadius={56} outerRadius={94} paddingAngle={2} dataKey="value" stroke="none">
                     {expenseByCategory.map((entry, i) => (
                       <Cell key={i} fill={entry.color} />
                     ))}
@@ -189,20 +190,20 @@ export default function Statistics({ transactions, categories, period, settings,
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex-1 space-y-1.5">
+            <div className="flex-1 min-w-0 space-y-2.5">
               {expenseByCategory.map(item => {
                 const pct = expense > 0 ? (item.value / expense) * 100 : 0;
                 return (
-                  <div key={item.name} className="flex items-center gap-2">
+                  <div key={item.name} className="flex items-center gap-2.5">
                     <span className="text-sm">{item.icon}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs truncate">{item.name}</span>
-                        <span className="text-xs num ml-2 flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
-                          {Math.round(pct)}%
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-sm font-semibold truncate">{item.name}</span>
+                        <span className="text-[13px] num flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                          {formatMoney(Math.round(item.value), settings.baseCurrency)} · {Math.round(pct)}%
                         </span>
                       </div>
-                      <div className="h-1 rounded-full mt-0.5 overflow-hidden" style={{ background: 'var(--border)' }}>
+                      <div className="h-1.5 rounded-full mt-1 overflow-hidden" style={{ background: 'var(--border)' }}>
                         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: item.color }} />
                       </div>
                     </div>
@@ -213,6 +214,7 @@ export default function Statistics({ transactions, categories, period, settings,
           </div>
         </div>
       )}
+      </div>
 
       {filtered.length === 0 && (
         <div className="card p-8 text-center">
